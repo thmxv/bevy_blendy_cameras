@@ -1,0 +1,22 @@
+[package]
+name = "bevy_blendy_cameras"
+version = "0.1.0"
+edition = "2021"
+authors = ["Xavier Thomas"]
+description = "Bevy cameras for Pan/Orbit/Zoom and Fly movements, set viewpoint and frame entities"
+keywords = ["gamedev", "bevy", "orbit", "fly", "camera"]
+categories = ["game-development"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/thmxv/bevy_blendy_cameras"
+homepage = "https://github.com/thmxv/bevy_blendy_cameras"
+readme = "README.md"
+
+[features]
+bevy_egui = ["dep:bevy_egui"]
+
+[dependencies]
+bevy = { version = "0.13", default-features = false, features = ["bevy_render", "bevy_winit"] }
+bevy_egui = { version = "0.27", optional = true, default-features = false }
+bevy_mod_raycast = { version = "0.17" }
+winit = "0.29"
+
