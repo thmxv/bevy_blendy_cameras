@@ -20,13 +20,12 @@ camera controls.
 - Doc
 - Clean code
 - Make fly mode works with orthographic projection
-- Fix fly movement not working if 3D view not clicked/scrolled first
 - Better multi-viewport and multi-window support
 - Option for grab/wrap around of cursor
 
 ## Cargo Features
 
-- `bevy_egui` (optional): Ignore input when `egui` had the focus
+- `bevy_egui` (optional): Ignore input when `egui` has the focus
 
 ## Version Compatibility
 
