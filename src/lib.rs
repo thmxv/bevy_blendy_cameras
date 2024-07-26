@@ -6,7 +6,7 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow, WindowRef},
     winit::WinitWindows,
 };
-use bevy_mod_raycast::DefaultRaycastingPlugin;
+use bevy_mod_raycast::prelude::*;
 
 #[cfg(feature = "bevy_egui")]
 use bevy_egui::EguiSet;
@@ -56,8 +56,8 @@ pub struct BlendyCamerasPlugin;
 
 impl Plugin for BlendyCamerasPlugin {
     fn build(&self, app: &mut App) {
-        if !app.is_plugin_added::<DefaultRaycastingPlugin>() {
-            app.add_plugins(DefaultRaycastingPlugin);
+        if !app.is_plugin_added::<CursorRayPlugin>() {
+            app.add_plugins(CursorRayPlugin);
         }
         app.init_resource::<ActiveCameraData>()
             .init_resource::<MouseKeyTracker>()

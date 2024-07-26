@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use bevy_mod_raycast::{immediate::Raycast, CursorRay};
+use bevy_mod_raycast::prelude::*;
 
 use crate::{
     input::{self, MouseKeyTracker},
