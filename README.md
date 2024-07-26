@@ -12,7 +12,7 @@ camera controls.
 - Fly camera controls
 - Move to viewpoints (top, bottom, front, back, left, right)
 - Frame entities into view
-- Grab cursor or wrap cursor aroung the viewport during orbit and fly rotation
+- Grab cursor or wrap cursor around the viewport during orbit and fly rotation
 - Egui support
 
 ## TODO
