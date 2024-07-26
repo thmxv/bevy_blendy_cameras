@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.2.0] 
+
+### Changed
+
+- Upgrade to Bevy 0.14
+
 ## [0.1.0] - 2024-07-26
 
 ### Added
