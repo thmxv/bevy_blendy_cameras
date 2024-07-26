@@ -1,17 +1,15 @@
 use bevy::{
     input::{keyboard::KeyCode, mouse::MouseWheel, ButtonInput},
     prelude::*,
-    render::camera::{CameraUpdateSystem, RenderTarget},
+    render::camera::{CameraUpdateSystem, RenderTarget, ScalingMode},
     transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow, WindowRef},
     winit::WinitWindows,
 };
-#[cfg(feature = "bevy_egui")]
-use bevy_egui::EguiSet;
 use bevy_mod_raycast::DefaultRaycastingPlugin;
 
 #[cfg(feature = "bevy_egui")]
-pub use crate::egui::EguiWantsFocus;
+use bevy_egui::EguiSet;
 
 pub use crate::{
     fly::{fly_camera_controller_system, FlyCameraController},
@@ -22,7 +20,8 @@ pub use crate::{
 };
 
 #[cfg(feature = "bevy_egui")]
-mod egui;
+pub use crate::egui::EguiWantsFocus;
+
 pub mod fly;
 pub mod frame;
 mod input;
@@ -30,17 +29,20 @@ pub mod orbit;
 mod utils;
 pub mod viewpoints;
 
-#[derive(Event)]
+#[cfg(feature = "bevy_egui")]
+mod egui;
+
+#[derive(Default, Event)]
 pub struct SwitchProjection;
 
-#[derive(Event)]
+#[derive(Default, Event)]
 pub struct SwitchToOrbitController;
 
-#[derive(Event)]
+#[derive(Default, Event)]
 pub struct SwitchToFlyController;
 
 #[derive(Resource, Default)]
-pub struct ProjectionResource(Projection);
+pub struct ProjectionResource(Option<Projection>);
 
 /// System set to allow ordering
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
@@ -50,9 +52,9 @@ pub struct EditorCamSystemSet;
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
 pub struct GuiFocusSystemSet;
 
-pub struct CameraControllerPlugin;
+pub struct BlendyCamerasPlugin;
 
-impl Plugin for CameraControllerPlugin {
+impl Plugin for BlendyCamerasPlugin {
     fn build(&self, app: &mut App) {
         if !app.is_plugin_added::<DefaultRaycastingPlugin>() {
             app.add_plugins(DefaultRaycastingPlugin);
@@ -492,12 +494,14 @@ pub fn switch_to_fly_camera_controller_system(
         if orbit_controller.is_enabled {
             orbit_controller.is_enabled = false;
             fly_controller.is_enabled = true;
+            // FIXME: commenting this makes fly mode works with ortho too
+            // but zoom and sensitivity behave wierdly
             if let Projection::Orthographic(_) = *projection {
                 switch_camera_projection(
-                    &mut orbit_controller,
+                    &orbit_controller,
                     &mut transform,
                     &mut next_projection.0,
-                    &mut *projection,
+                    &mut projection,
                 );
             }
         }
@@ -507,19 +511,36 @@ pub fn switch_to_fly_camera_controller_system(
 fn switch_camera_projection(
     orbit_controller: &OrbitCameraController,
     transform: &mut Transform,
-    next_projection: &mut Projection,
+    next_projection: &mut Option<Projection>,
     projection: &mut Projection,
 ) {
-    // Need to update transform/projection
-    utils::update_orbit_transform(
-        orbit_controller.yaw.unwrap(),
-        orbit_controller.pitch.unwrap(),
-        orbit_controller.radius.unwrap(),
-        orbit_controller.focus,
-        transform,
-        next_projection,
-    );
-    std::mem::swap(next_projection, projection);
+    if next_projection.is_none() {
+        *next_projection = match projection {
+            Projection::Perspective(_) => {
+                Some(Projection::Orthographic(OrthographicProjection {
+                    scaling_mode: ScalingMode::FixedVertical(1.0),
+                    ..default()
+                }))
+            }
+            Projection::Orthographic(_) => {
+                Some(Projection::Perspective(PerspectiveProjection {
+                    ..default()
+                }))
+            }
+        }
+    }
+    if let Some(next) = next_projection {
+        // Need to update transform/projection
+        utils::update_orbit_transform(
+            orbit_controller.yaw.unwrap(),
+            orbit_controller.pitch.unwrap(),
+            orbit_controller.radius.unwrap(),
+            orbit_controller.focus,
+            transform,
+            next,
+        );
+        std::mem::swap(next, projection);
+    }
 }
 
 pub fn switch_camera_projection_system(
@@ -533,18 +554,18 @@ pub fn switch_camera_projection_system(
 ) {
     for _ev in ev_read.read() {
         trace!("Camera projection switch");
-        let Ok((mut transform, mut orbit_controller, mut projection)) =
+        // Do not switch if in fly mode, which only work in perspective for now
+        let Ok((mut transform, orbit_controller, mut projection)) =
             query.get_single_mut()
         else {
             return;
         };
-        // Do not switch if in fly mode
         if orbit_controller.is_enabled {
             switch_camera_projection(
-                &mut orbit_controller,
+                &orbit_controller,
                 &mut transform,
                 &mut next_projection.0,
-                &mut *projection,
+                &mut projection,
             );
         }
     }

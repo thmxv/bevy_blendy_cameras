@@ -71,18 +71,14 @@ impl OrbitCameraController {
             let &mut pitch = self.pitch.get_or_insert(pitch);
             let &mut radius = self.radius.get_or_insert(radius);
             utils::update_orbit_transform(
-                yaw,
-                pitch,
-                radius,
-                self.focus,
-                transform,
-                projection,
+                yaw, pitch, radius, self.focus, transform, projection,
             );
             self.is_initialized = true;
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn orbit_camera_controller_system(
     active_cam: Res<ActiveCameraData>,
     key_input: Res<ButtonInput<KeyCode>>,

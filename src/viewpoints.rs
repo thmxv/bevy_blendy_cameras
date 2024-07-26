@@ -84,6 +84,7 @@ impl Viewpoint {
 #[derive(Event)]
 pub struct ViewpointEvent(pub Viewpoint);
 
+#[allow(clippy::type_complexity)]
 pub fn viewpoint_system(
     mut ev_read: EventReader<ViewpointEvent>,
     // active_cam: Res<ActiveCameraData>,

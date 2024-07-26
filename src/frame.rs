@@ -9,6 +9,7 @@ pub struct FrameEvent {
 }
 
 /// Return (min, max). If min > max there was no valid bounds to return.
+#[allow(clippy::type_complexity)]
 fn get_entities_aabb(
     entities: &[Entity],
     include_children: bool,
@@ -53,6 +54,7 @@ fn get_entities_aabb(
         .fold(default_bounds, combine_bounds)
 }
 
+#[allow(clippy::type_complexity)]
 pub fn frame_system(
     mut ev_read: EventReader<FrameEvent>,
     // active_cam: Res<ActiveCameraData>,
@@ -95,8 +97,8 @@ pub fn frame_system(
         // the object. For the moment we center on the AABB center but the
         // object is not centered in the view if viewed diagonaly.
         // For the moment just multiply distance to center to make sure all the
-        // object in into view.
-        let distance_camera_to_aabb_center = 1.2 * aabb_radius;
+        // object is into view.
+        let distance_camera_to_aabb_center = 1.5 * aabb_radius;
         let distance_camera_to_aabb_center =
             distance_camera_to_aabb_center.max(0.05);
 

@@ -16,6 +16,7 @@ pub struct MouseKeyTracker {
 }
 
 // TODO: Maybe make 2 systems
+#[allow(clippy::too_many_arguments)]
 pub fn mouse_key_tracker_system(
     mut camera_movement: ResMut<MouseKeyTracker>,
     mouse_input: Res<ButtonInput<MouseButton>>,
