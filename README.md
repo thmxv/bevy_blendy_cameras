@@ -5,7 +5,7 @@
 Editor like cameras controls and features inspired by Blender's viewport 
 camera controls.
 
-## Freatures
+## Features
 
 - Pan/orbit/zoom camera controls with "zoom to mouse position" and 
   "auto depth" options
@@ -22,6 +22,8 @@ camera controls.
 - Make fly mode works with orthographic projection
 - Better multi-viewport and multi-window support
 - Option for grab/wrap around of cursor
+- Support "Auto depth" for pan movement. So that the result of the raycast under the mouse coursor always stays under the mouse cursor during pan, if no cursor grab/wrap (which there always is at the moment).
+- Make the raycast used for "Auto depth" respect the materials backface culling setting. Maybe optionally because this might conflict with other raycast options used for other uses by the user.
 
 ## Cargo Features
 
