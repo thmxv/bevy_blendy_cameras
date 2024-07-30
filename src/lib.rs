@@ -46,7 +46,7 @@ pub struct ProjectionResource(Option<Projection>);
 
 /// System set to allow ordering
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
-pub struct EditorCamSystemSet;
+pub struct BlendyCamerasSystemSet;
 
 /// System set to only run when GUI has NOT the focus
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
@@ -77,7 +77,7 @@ impl Plugin for BlendyCamerasPlugin {
                 )
                     .chain()
                     .in_set(GuiFocusSystemSet)
-                    .in_set(EditorCamSystemSet)
+                    .in_set(BlendyCamerasSystemSet)
                     .before(CameraUpdateSystem)
                     .before(TransformSystem::TransformPropagate),
             )
@@ -96,7 +96,7 @@ impl Plugin for BlendyCamerasPlugin {
                     viewpoint_system,
                     frame_system,
                 )
-                    .in_set(EditorCamSystemSet)
+                    .in_set(BlendyCamerasSystemSet)
                     .before(GuiFocusSystemSet),
             );
         #[cfg(feature = "bevy_egui")]
