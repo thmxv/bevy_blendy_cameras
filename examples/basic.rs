@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::schedule::{LogLevel, ScheduleBuildSettings},
     input::{
         keyboard::{Key, KeyboardInput},
         ButtonState,
@@ -6,6 +7,7 @@ use bevy::{
     prelude::*,
     //render::camera::ScalingMode,
 };
+
 use bevy_blendy_cameras::{
     viewpoints::Viewpoint, BlendyCamerasPlugin, FlyCameraController,
     FrameEvent, OrbitCameraController, SwitchProjection, SwitchToFlyController,
@@ -58,8 +60,12 @@ pub struct HelpText {
 }
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
+    let mut app = App::new();
+    app.configure_schedules(ScheduleBuildSettings {
+        ambiguity_detection: LogLevel::Warn,
+        ..default()
+    });
+    app.add_plugins(DefaultPlugins)
         .add_plugins(BlendyCamerasPlugin)
         .add_systems(Startup, setup_system)
         .add_systems(
