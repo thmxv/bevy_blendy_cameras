@@ -68,8 +68,7 @@ impl Plugin for BlendyCamerasPlugin {
             .add_event::<ViewpointEvent>()
             .add_event::<FrameEvent>()
             .add_systems(
-                //PostUpdate,
-                Update,
+                PostUpdate,
                 (
                     mouse_key_tracker_system,
                     orbit_camera_controller_system,
@@ -82,8 +81,7 @@ impl Plugin for BlendyCamerasPlugin {
                     .before(TransformSystem::TransformPropagate),
             )
             .add_systems(
-                //PostUpdate,
-                Update,
+                PostUpdate,
                 (
                     active_viewport_data_system.run_if(
                         |active_cam: Res<ActiveCameraData>| !active_cam.manual,
@@ -103,16 +101,14 @@ impl Plugin for BlendyCamerasPlugin {
         {
             app.init_resource::<EguiWantsFocus>()
                 .add_systems(
-                    //PostUpdate,
-                    Update,
+                    PostUpdate,
                     egui::check_egui_wants_focus
                         .after(EguiSet::InitContexts)
                         //.before(EditorCamSystemSet)
                         .before(GuiFocusSystemSet),
                 )
                 .configure_sets(
-                    //PostUpdate,
-                    Update,
+                    PostUpdate,
                     GuiFocusSystemSet.run_if(resource_equals(EguiWantsFocus {
                         prev: false,
                         curr: false,
