@@ -17,13 +17,56 @@ camera controls.
 
 ## TODO
 
-- Doc
 - Clean code
 - Make fly mode works with orthographic projection
 - Better multi-viewport and multi-window support
 - Option for grab/wrap around of cursor
 - Support "Auto depth" for pan movement. So that the result of the raycast under the mouse coursor always stays under the mouse cursor during pan, if no cursor grab/wrap (which there always is at the moment).
 - Make the raycast used for "Auto depth" respect the materials backface culling setting. Maybe optionally because this might conflict with other raycast options used for other uses by the user.
+
+## Default Controls
+
+### OrbitCameraController
+
+- Middle mouse drag - Orbit
+- Shift + Middle mouse drag - Pan
+- Scroll wheel - Zoom
+
+### FlyCameraController
+
+- Middle mouse drag - Rotate
+- Scroll wheel - Change movement speed
+- E - Move forward (zoom)
+- D - Move backward (unzoom)
+- S - Move to the left
+- F - Move to the right
+- W - Move to the bottom
+- R - Move to the top
+
+## Quick Start
+
+Add the plugin:
+```rust ignore
+.add_plugins(BlendyCamerasPlugin)
+```
+
+Add the controllers components to a camera:
+``` rust ignore
+commands.spawn((
+    Camera3dBundle {
+        transform: Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
+        ..default()
+    },
+    OrbitCameraController::default(),
+    FlyCameraController {
+        is_enabled: false,
+        ..default()
+    },
+));
+```
+
+Check out the [basic example](https://github.com/thmxv/bevy_blendy_cameras/tree/master/examples/basic.rs] 
+to see more functionalities.
 
 ## Cargo Features
 
