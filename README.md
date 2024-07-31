@@ -64,7 +64,7 @@ commands.spawn((
 ));
 ```
 
-Check out the [basic example](https://github.com/thmxv/bevy_blendy_cameras/tree/master/examples/basic.rs] 
+Check out the [basic example](https://github.com/thmxv/bevy_blendy_cameras/tree/master/examples/basic.rs) 
 to see more functionalities.
 
 ## Cargo Features
