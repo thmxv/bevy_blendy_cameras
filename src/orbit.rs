@@ -8,25 +8,70 @@ use crate::{
     utils, ActiveCameraData,
 };
 
+/// Component to tag an entiy as able to be controlled by orbiting, panning 
+/// and zooming.
+/// The entity must have `Transform` and `Projection` components. Typically 
+/// you would add `Camera3dBundle` to this entity.
 #[derive(Component)]
 pub struct OrbitCameraController {
+    /// The point the camera looks at. The camera also orbit around and zoom
+    /// to that point if `auto_depth` and `zoom_to_mouse_position` are not set.
+    /// This is updated when panning or when zooming to the mouse position 
+    /// or when zooming or orbiting when `auto_depth` is set.
     pub focus: Vec3,
+    /// The distance between the camera and the `focus`.
+    /// If set to `None`, it will be calculated from the camera's current 
+    /// position during intialization.
+    /// Automatically updated
     pub radius: Option<f32>,
+    /// Rotation in radian around the global Y axis.
+    /// If set to `None`, it will be calculated from the camera's current 
+    /// position during intialization.
+    /// Automatically updated
     pub yaw: Option<f32>,
+    /// Rotation in radian around a global horizontal axis perpendicular to 
+    /// the view direction.
+    /// If set to `None`, it will be calculated from the camera's current 
+    /// position during intialization.
+    /// Automatically updated
     pub pitch: Option<f32>,
+    /// Sentitivity of the orbiting motion
     pub orbit_sensitivity: f32,
+    /// Sentitivity of the panning motion
     pub pan_sensitivity: f32,
+    /// Sentitivity of the zooming motion
     pub zoom_sensitivity: f32,
+    /// Mouse button used to orbit the camera
     pub button_orbit: MouseButton,
+    /// Key that must be pressed for the `button_orbit` to work
     pub modifier_orbit: Option<KeyCode>,
+    /// Mouse button used to pan the camera
     pub button_pan: MouseButton,
+    /// Key that must be pressed for the `button_pan` to work
     pub modifier_pan: Option<KeyCode>,
+    /// Do not control the camera if `false`
     pub is_enabled: bool,
+    /// Whether [`OrbitCameraController`] has been initialized
     pub is_initialized: bool,
+    /// Enable zooming in the direction of the mouse cursor
     pub zoom_to_mouse_position: bool,
+    /// Enable setting the focus to the distance of the geometry under the 
+    /// mouse cursor while moving the camera. This will cause the camera to 
+    /// orbit around the geometry under the mouse cursor and zoom speed beeing
+    /// relative to the distance to this geometry point.
     pub auto_depth: bool,
+    /// Wrap the mouse cursor while rotating or panning if `true`.
+    /// Because wrapping is not working on all platfrom or with all windowing
+    /// system, this will also cause a mouse grab/lock.
     pub wrap_cursor: bool,
+    /// Whether the camera is currently upside down. Inverting the direction
+    /// of rotation to be more intuitive.
+    /// Automatically updated
     pub is_upside_down: bool,
+    /// Whether to update the camera's transform regardless of whether there
+    /// are any changes/input.
+    /// Set this to `true` if you want to modify values directly.
+    /// This will be automatically set back to `false` after one frame.
     pub force_update: bool,
 }
 
@@ -56,7 +101,7 @@ impl Default for OrbitCameraController {
 }
 
 impl OrbitCameraController {
-    pub fn initialize_if_necessary(
+    pub(crate) fn initialize_if_necessary(
         &mut self,
         transform: &mut Transform,
         projection: &mut Projection,
@@ -79,7 +124,7 @@ impl OrbitCameraController {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn orbit_camera_controller_system(
+pub(crate) fn orbit_camera_controller_system(
     active_cam: Res<ActiveCameraData>,
     key_input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,

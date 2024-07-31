@@ -1,3 +1,16 @@
+//! Camera Controllers and tools for editor like 3D views
+//!
+//! Inspired by Blender's viewport camera controls and tools and provide
+//! the same functionalities:
+//! - Pan/Orbit/Zoom camera controls with "Zoom to mouse position" and
+//!   "Auto depth".
+//! - Fly camera controls with zooming (back, forward), panning (left, right,
+//!   down, up) and speed controls.
+//! - Set viewpoint: View from left, right, front, back, top and bottom.
+//! - Frame entities into view: Allowing to do things like framing the whole
+//!   scene, or the selected objects.
+//! - Switch between orthographic and perspective camera projection
+
 use bevy::{
     input::{keyboard::KeyCode, mouse::MouseWheel, ButtonInput},
     prelude::*,
@@ -6,12 +19,13 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow, WindowRef},
     winit::WinitWindows,
 };
+#[cfg(feature = "bevy_egui")]
+use bevy_egui::EguiSet;
 use bevy_mod_raycast::prelude::*;
 
 #[cfg(feature = "bevy_egui")]
-use bevy_egui::EguiSet;
-
-pub use crate::{
+use crate::egui::EguiWantsFocus;
+use crate::{
     fly::{fly_camera_controller_system, FlyCameraController},
     frame::{frame_system, FrameEvent},
     input::{mouse_key_tracker_system, MouseKeyTracker},
@@ -19,28 +33,40 @@ pub use crate::{
     viewpoints::{viewpoint_system, ViewpointEvent},
 };
 
-#[cfg(feature = "bevy_egui")]
-pub use crate::egui::EguiWantsFocus;
-
+/// Module for "Fly mode" camera controls
 pub mod fly;
+
+/// Module for framing entities
 pub mod frame;
-mod input;
+
+/// Module for "Pan/Orbit/Zoom" camera controls
 pub mod orbit;
-mod utils;
+
+/// Module for setting viewpoints
 pub mod viewpoints;
 
-#[cfg(feature = "bevy_egui")]
-mod egui;
+mod input;
+mod utils;
 
+#[cfg(feature = "bevy_egui")]
+pub mod egui;
+
+/// Event to switch between perspective and ortographic camera projections
 #[derive(Default, Event)]
 pub struct SwitchProjection;
 
+/// Event to enable the [`OrbitCameraController`] and disable the
+/// [`FlyCameraController`] if present
 #[derive(Default, Event)]
 pub struct SwitchToOrbitController;
 
+/// Event to enable the [`FlyCameraController`] and disable the
+/// [`OrbitCameraController`] if present
 #[derive(Default, Event)]
 pub struct SwitchToFlyController;
 
+/// Resource that contains the saved camera projection (orthographic,
+/// perspective) to be switched to when switching camera projection
 #[derive(Resource, Default)]
 pub struct ProjectionResource(Option<Projection>);
 
@@ -52,6 +78,7 @@ pub struct BlendyCamerasSystemSet;
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
 pub struct GuiFocusSystemSet;
 
+/// Bevy pluging that contains all the systems necessarty to this crate
 pub struct BlendyCamerasPlugin;
 
 impl Plugin for BlendyCamerasPlugin {
@@ -129,7 +156,7 @@ impl Plugin for BlendyCamerasPlugin {
 pub struct ActiveCameraData {
     /// ID of the entity with `OrbitCameraController` or `FlyCameraController`
     /// that will handle user input. In other words, this is the camera that
-    /// will move when you orbit/pan/zoom.
+    /// will move when you rotate/pan/zoom.
     pub entity: Option<Entity>,
     /// The viewport size. This is only used to scale the panning mouse motion.
     /// I recommend setting this to the actual render target dimensions (e.g.
@@ -142,13 +169,15 @@ pub struct ActiveCameraData {
     /// `PanOrbitCamera::orbit_sensitivity` to adjust the sensitivity if
     /// required.
     pub window_size: Option<Vec2>,
-    /// Indicates to `PanOrbitCameraPlugin` that it should not update/overwrite
+    /// Indicates to `BevyCamerasPlugin` that it should not update/overwrite
     /// this resource. If you are manually updating this resource you should
     /// set this to `true`. Note that setting this to `true` will effectively
     /// break multiple viewport/window support unless you manually reimplement
     /// it.
     pub manual: bool,
-    // TODO: Doc
+    /// The entity of the window containing the viewport. This is used to grab
+    /// or wrap around the cursor while controlling the camera with mouse
+    /// movements.
     pub window_entity: Option<Entity>,
 }
 
@@ -282,7 +311,8 @@ fn active_viewport_data_system(
     }
 }
 
-pub fn wrap_grab_center_cursor_system(
+/// Grap, wrap around and center cursor when needed
+fn wrap_grab_center_cursor_system(
     active_cam: Res<ActiveCameraData>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     key_input: Res<ButtonInput<KeyCode>>,
@@ -380,12 +410,14 @@ pub fn wrap_grab_center_cursor_system(
     if drag_just_activated {
         *cursor_start_pos = window.cursor_position();
         if wrap_cursor {
+            // HACK: No need to grab/lock cursor if warp worked with all
+            // window manager on all platforms
             // TODO: This grab cursor works differently on X11, Wayland,
             // window, mac, android, ios, ... Test more OS
-            // For not it is only tested on X11 and Wayland
-            // - On X11 no lock works, but we can set the cursor position
+            // For now it is only tested on X11 and Wayland
+            // - On X11 no lock mode works, but we can set the cursor position
             //   manually.
-            // - On Wayland only Locked works and cannot set cursor position
+            // - On Wayland only `Locked` works and cannot set cursor position
             //   unless it is locked according to message but can never be
             //   set according to tests.
             window.cursor.grab_mode = CursorGrabMode::Locked;
@@ -440,7 +472,7 @@ pub fn wrap_grab_center_cursor_system(
     }
 }
 
-pub fn switch_to_orbit_camera_controller_system(
+fn switch_to_orbit_camera_controller_system(
     mut ev_read: EventReader<SwitchToOrbitController>,
     mut query: Query<(
         &Transform,
@@ -467,7 +499,7 @@ pub fn switch_to_orbit_camera_controller_system(
     }
 }
 
-pub fn switch_to_fly_camera_controller_system(
+fn switch_to_fly_camera_controller_system(
     mut next_projection: ResMut<ProjectionResource>,
     mut ev_read: EventReader<SwitchToFlyController>,
     mut query: Query<(
@@ -539,7 +571,7 @@ fn switch_camera_projection(
     }
 }
 
-pub fn switch_camera_projection_system(
+fn switch_camera_projection_system(
     mut next_projection: ResMut<ProjectionResource>,
     mut ev_read: EventReader<SwitchProjection>,
     mut query: Query<(

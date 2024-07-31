@@ -9,9 +9,12 @@ use bevy::{
 };
 
 use bevy_blendy_cameras::{
-    viewpoints::Viewpoint, BlendyCamerasPlugin, FlyCameraController,
-    FrameEvent, OrbitCameraController, SwitchProjection, SwitchToFlyController,
-    SwitchToOrbitController, ViewpointEvent,
+    fly::FlyCameraController,
+    frame::FrameEvent,
+    orbit::OrbitCameraController,
+    viewpoints::{Viewpoint, ViewpointEvent},
+    BlendyCamerasPlugin, SwitchProjection, SwitchToFlyController,
+    SwitchToOrbitController,
 };
 
 // FIXME: Make fly mode work in ortho projection

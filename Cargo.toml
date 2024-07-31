@@ -11,6 +11,25 @@ repository = "https://github.com/thmxv/bevy_blendy_cameras"
 homepage = "https://github.com/thmxv/bevy_blendy_cameras"
 readme = "README.md"
 
+[lints.clippy]
+doc_markdown = "warn"
+manual_let_else = "warn"
+undocumented_unsafe_blocks = "warn"
+redundant_else = "warn"
+match_same_arms = "warn"
+semicolon_if_nothing_returned = "warn"
+redundant_closure_for_method_calls = "warn"
+unwrap_or_default = "warn"
+
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+ref_as_ptr = "warn"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+missing_docs = "warn"
+unsafe_code = "deny"
+
 [features]
 bevy_egui = ["dep:bevy_egui"]
 

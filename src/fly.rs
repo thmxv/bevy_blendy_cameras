@@ -4,21 +4,38 @@ use bevy::prelude::*;
 
 use crate::{input::MouseKeyTracker, ActiveCameraData};
 
+/// Component to tag an entiy as able to be controlled in "fly mode"
+/// The entity must have `Transform` and `Projection` components. Typically 
+/// you would add `Camera3dBundle` to this entity.
 #[derive(Component)]
 pub struct FlyCameraController {
+    /// Speed with wich the entity is moved. Updated when scrolling mouse wheel
     pub speed: f32,
+    /// Key used to move the camera forward
     pub key_move_forward: KeyCode,
+    /// Key used to move the camera backward
     pub key_move_backward: KeyCode,
+    /// Key used to move the camera left
     pub key_move_left: KeyCode,
+    /// Key used to move the camera right
     pub key_move_right: KeyCode,
+    /// Key used to move the camera up
     pub key_move_up: KeyCode,
+    /// Key used to move the camera down
     pub key_move_down: KeyCode,
+    /// Mouse button used to rotate the camera
     pub button_rotate: MouseButton,
+    /// Key that must be pressed for the `button_rotate` to work
     pub modifier_rotate: Option<KeyCode>,
+    /// Sensitivity of the speed change
     pub speed_sensitivity: f32,
+    /// Sensitivity of the movement
     pub move_sensitivity: f32,
+    /// Sensitivity of the rotation
     pub rotate_sensitivity: f32,
+    /// Do not control the camera if `false`
     pub is_enabled: bool,
+    /// Grab the mouse cursor while rotating if `true`
     pub grab_cursor: bool,
 }
 
@@ -43,7 +60,7 @@ impl Default for FlyCameraController {
     }
 }
 
-pub fn fly_camera_controller_system(
+pub(crate) fn fly_camera_controller_system(
     active_cam: Res<ActiveCameraData>,
     key_input: Res<ButtonInput<KeyCode>>,
     mouse_key_tracker: Res<MouseKeyTracker>,

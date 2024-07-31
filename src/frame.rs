@@ -2,9 +2,12 @@ use bevy::{prelude::*, render::primitives::Aabb};
 
 use crate::{fly::FlyCameraController, orbit::OrbitCameraController, utils};
 
+/// Event to move the camera to frame certain entities
 #[derive(Event)]
 pub struct FrameEvent {
+    /// Entities to frames
     pub entities: Vec<Entity>,
+    /// Also frame children of entities
     pub include_children: bool,
 }
 
@@ -55,7 +58,7 @@ fn get_entities_aabb(
 }
 
 #[allow(clippy::type_complexity)]
-pub fn frame_system(
+pub(crate) fn frame_system(
     mut ev_read: EventReader<FrameEvent>,
     // active_cam: Res<ActiveCameraData>,
     mut cameras_query: Query<

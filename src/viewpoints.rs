@@ -9,13 +9,20 @@ use crate::{
     utils,
 };
 
+/// Point of view of a camera, looking in the oposite direction
 #[derive(Debug, Copy, Clone)]
 pub enum Viewpoint {
+    /// View from top
     Top,
+    /// View from bottom
     Bottom,
+    /// View from front
     Front,
+    /// View from back
     Back,
+    /// View from left
     Left,
+    /// View from right
     Right,
 }
 
@@ -32,7 +39,7 @@ impl Viewpoint {
     //     }
     // }
 
-    pub fn to_yaw_pitch(self) -> (f32, f32) {
+    pub(crate) fn to_yaw_pitch(self) -> (f32, f32) {
         match self {
             Self::Top => (0.0, FRAC_PI_2),
             Self::Bottom => (0.0, -FRAC_PI_2),
@@ -43,7 +50,7 @@ impl Viewpoint {
         }
     }
 
-    pub fn from_yaw_pitch(yaw: f32, pitch: f32) -> Option<Self> {
+    fn from_yaw_pitch(yaw: f32, pitch: f32) -> Option<Self> {
         // println!("{yaw} {pitch}");
         if utils::approx_equal(yaw, 0.0)
             && utils::approx_equal(pitch, FRAC_PI_2)
@@ -75,17 +82,19 @@ impl Viewpoint {
         }
     }
 
+    /// Calculate [`Viewpoint`] from camera [`Transform`]
     pub fn from_transform(transform: &Transform) -> Option<Self> {
         let (yaw, pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
         Self::from_yaw_pitch(yaw, -pitch)
     }
 }
 
+/// Event used to set the camera point of view
 #[derive(Event)]
 pub struct ViewpointEvent(pub Viewpoint);
 
 #[allow(clippy::type_complexity)]
-pub fn viewpoint_system(
+pub(crate) fn viewpoint_system(
     mut ev_read: EventReader<ViewpointEvent>,
     // active_cam: Res<ActiveCameraData>,
     mut cameras_query: Query<
