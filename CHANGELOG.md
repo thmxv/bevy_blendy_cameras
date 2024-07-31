@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.3.1] 
+
+### Changed
+
+- Fixes in the README.md
+
 ## [0.3.0] 
 
 ### Added
@@ -26,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation
 
 ### Changed
+
 - Some functions are now private and not public anymore
 - Some `use` are now private and not public anymore 
 
