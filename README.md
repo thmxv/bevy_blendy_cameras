@@ -76,7 +76,7 @@ to see more functionalities.
 
 | bevy | bevy_blendy_cameras |
 |------|---------------------|
-| 0.14 | 0.2                 |
+| 0.14 | 0.2-0.3             |
 | 0.13 | 0.1                 |
 
 ## Credits
