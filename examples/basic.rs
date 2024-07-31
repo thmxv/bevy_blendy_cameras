@@ -1,3 +1,5 @@
+//! A basic example showing all the functionalities
+
 use bevy::{
     ecs::schedule::{LogLevel, ScheduleBuildSettings},
     input::{
@@ -52,13 +54,13 @@ const FLY_HELP_TEXT: &str = "\
     ";
 
 #[derive(Default, Resource)]
-pub struct Scene {
+struct Scene {
     pub scene_entity: Option<Entity>,
     pub cube_entity: Option<Entity>,
 }
 
 #[derive(Default, Resource)]
-pub struct HelpText {
+struct HelpText {
     pub help_text_entity: Option<Entity>,
 }
 
