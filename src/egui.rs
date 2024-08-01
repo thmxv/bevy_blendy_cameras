@@ -18,7 +18,7 @@ pub struct EguiWantsFocus {
     pub curr: bool,
 }
 
-pub fn check_egui_wants_focus(
+pub(crate) fn check_egui_wants_focus(
     contexts: bevy_egui::EguiContexts,
     mut wants_focus: ResMut<EguiWantsFocus>,
     windows: Query<Entity, With<Window>>,

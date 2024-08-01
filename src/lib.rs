@@ -48,6 +48,7 @@ pub mod viewpoints;
 mod input;
 mod utils;
 
+/// Module for Egui support
 #[cfg(feature = "bevy_egui")]
 pub mod egui;
 
