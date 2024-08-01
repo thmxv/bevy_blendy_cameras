@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Resource, Default, Debug)]
-pub struct MouseKeyTracker {
+pub(crate) struct MouseKeyTracker {
     pub orbit: Vec2,
     pub pan: Vec2,
     pub scroll_line: f32,
@@ -17,7 +17,7 @@ pub struct MouseKeyTracker {
 
 // TODO: Maybe make 2 systems
 #[allow(clippy::too_many_arguments)]
-pub fn mouse_key_tracker_system(
+pub(crate) fn mouse_key_tracker_system(
     mut camera_movement: ResMut<MouseKeyTracker>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     key_input: Res<ButtonInput<KeyCode>>,
@@ -130,7 +130,7 @@ pub fn mouse_key_tracker_system(
     }
 }
 
-pub fn orbit_pressed(
+pub(crate) fn orbit_pressed(
     pan_orbit: &OrbitCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -146,7 +146,7 @@ pub fn orbit_pressed(
             .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
-pub fn orbit_just_pressed(
+pub(crate) fn orbit_just_pressed(
     pan_orbit: &OrbitCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -162,7 +162,7 @@ pub fn orbit_just_pressed(
             .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
-pub fn orbit_just_released(
+pub(crate) fn orbit_just_released(
     pan_orbit: &OrbitCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -178,7 +178,7 @@ pub fn orbit_just_released(
             .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
-pub fn pan_pressed(
+pub(crate) fn pan_pressed(
     pan_orbit: &OrbitCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -194,7 +194,7 @@ pub fn pan_pressed(
             .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
-pub fn pan_just_pressed(
+pub(crate) fn pan_just_pressed(
     pan_orbit: &OrbitCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -210,7 +210,7 @@ pub fn pan_just_pressed(
             .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
-pub fn pan_just_released(
+pub(crate) fn pan_just_released(
     pan_orbit: &OrbitCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -226,7 +226,7 @@ pub fn pan_just_released(
             .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
-pub fn rotate_pressed(
+pub(crate) fn rotate_pressed(
     fly_controller: &FlyCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -237,7 +237,7 @@ pub fn rotate_pressed(
         && mouse_input.pressed(fly_controller.button_rotate)
 }
 
-pub fn rotate_just_pressed(
+pub(crate) fn rotate_just_pressed(
     fly_controller: &FlyCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
@@ -248,7 +248,7 @@ pub fn rotate_just_pressed(
         && (mouse_input.just_pressed(fly_controller.button_rotate))
 }
 
-pub fn rotate_just_released(
+pub(crate) fn rotate_just_released(
     fly_orbit: &FlyCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,

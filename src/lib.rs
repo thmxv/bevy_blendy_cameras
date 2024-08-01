@@ -24,33 +24,30 @@ use bevy_egui::EguiSet;
 use bevy_mod_raycast::prelude::*;
 
 #[cfg(feature = "bevy_egui")]
-use crate::egui::EguiWantsFocus;
+pub use crate::egui::EguiWantsFocus;
 use crate::{
-    fly::{fly_camera_controller_system, FlyCameraController},
-    frame::{frame_system, FrameEvent},
+    fly::fly_camera_controller_system,
+    frame::frame_system,
     input::{mouse_key_tracker_system, MouseKeyTracker},
-    orbit::{orbit_camera_controller_system, OrbitCameraController},
-    viewpoints::{viewpoint_system, ViewpointEvent},
+    orbit::orbit_camera_controller_system,
+    viewpoints::viewpoint_system,
+};
+pub use crate::{
+    fly::FlyCameraController,
+    frame::FrameEvent,
+    orbit::OrbitCameraController,
+    viewpoints::{Viewpoint, ViewpointEvent},
 };
 
-/// Module for "Fly mode" camera controls
-pub mod fly;
-
-/// Module for framing entities
-pub mod frame;
-
-/// Module for "Pan/Orbit/Zoom" camera controls
-pub mod orbit;
-
-/// Module for setting viewpoints
-pub mod viewpoints;
-
+mod fly;
+mod frame;
 mod input;
+mod orbit;
 mod utils;
+mod viewpoints;
 
-/// Module for Egui support
 #[cfg(feature = "bevy_egui")]
-pub mod egui;
+mod egui;
 
 /// Event to switch between perspective and ortographic camera projections
 #[derive(Default, Event)]
