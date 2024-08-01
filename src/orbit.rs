@@ -8,30 +8,30 @@ use crate::{
     utils, ActiveCameraData,
 };
 
-/// Component to tag an entiy as able to be controlled by orbiting, panning 
+/// Component to tag an entiy as able to be controlled by orbiting, panning
 /// and zooming.
-/// The entity must have `Transform` and `Projection` components. Typically 
+/// The entity must have `Transform` and `Projection` components. Typically
 /// you would add `Camera3dBundle` to this entity.
 #[derive(Component)]
 pub struct OrbitCameraController {
     /// The point the camera looks at. The camera also orbit around and zoom
     /// to that point if `auto_depth` and `zoom_to_mouse_position` are not set.
-    /// This is updated when panning or when zooming to the mouse position 
+    /// This is updated when panning or when zooming to the mouse position
     /// or when zooming or orbiting when `auto_depth` is set.
     pub focus: Vec3,
     /// The distance between the camera and the `focus`.
-    /// If set to `None`, it will be calculated from the camera's current 
+    /// If set to `None`, it will be calculated from the camera's current
     /// position during intialization.
     /// Automatically updated
     pub radius: Option<f32>,
     /// Rotation in radian around the global Y axis.
-    /// If set to `None`, it will be calculated from the camera's current 
+    /// If set to `None`, it will be calculated from the camera's current
     /// position during intialization.
     /// Automatically updated
     pub yaw: Option<f32>,
-    /// Rotation in radian around a global horizontal axis perpendicular to 
+    /// Rotation in radian around a global horizontal axis perpendicular to
     /// the view direction.
-    /// If set to `None`, it will be calculated from the camera's current 
+    /// If set to `None`, it will be calculated from the camera's current
     /// position during intialization.
     /// Automatically updated
     pub pitch: Option<f32>,
@@ -55,8 +55,8 @@ pub struct OrbitCameraController {
     pub is_initialized: bool,
     /// Enable zooming in the direction of the mouse cursor
     pub zoom_to_mouse_position: bool,
-    /// Enable setting the focus to the distance of the geometry under the 
-    /// mouse cursor while moving the camera. This will cause the camera to 
+    /// Enable setting the focus to the distance of the geometry under the
+    /// mouse cursor while moving the camera. This will cause the camera to
     /// orbit around the geometry under the mouse cursor and zoom speed beeing
     /// relative to the distance to this geometry point.
     pub auto_depth: bool,

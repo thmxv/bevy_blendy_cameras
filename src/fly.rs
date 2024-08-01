@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::{input::MouseKeyTracker, ActiveCameraData};
 
 /// Component to tag an entiy as able to be controlled in "fly mode"
-/// The entity must have `Transform` and `Projection` components. Typically 
+/// The entity must have `Transform` and `Projection` components. Typically
 /// you would add `Camera3dBundle` to this entity.
 #[derive(Component)]
 pub struct FlyCameraController {
