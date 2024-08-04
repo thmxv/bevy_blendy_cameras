@@ -22,6 +22,7 @@ use bevy::{
 #[cfg(feature = "bevy_egui")]
 use bevy_egui::EguiSet;
 use bevy_mod_raycast::prelude::*;
+use raycast::BlendyCamerasRaycastSet;
 
 #[cfg(feature = "bevy_egui")]
 pub use crate::egui::EguiWantsFocus;
@@ -30,6 +31,7 @@ use crate::{
     frame::frame_system,
     input::{mouse_key_tracker_system, MouseKeyTracker},
     orbit::orbit_camera_controller_system,
+    raycast::startup_system,
     viewpoints::viewpoint_system,
 };
 pub use crate::{
@@ -39,15 +41,15 @@ pub use crate::{
     viewpoints::{Viewpoint, ViewpointEvent},
 };
 
+#[cfg(feature = "bevy_egui")]
+mod egui;
 mod fly;
 mod frame;
 mod input;
 mod orbit;
+mod raycast;
 mod utils;
 mod viewpoints;
-
-#[cfg(feature = "bevy_egui")]
-mod egui;
 
 /// Event to switch between perspective and ortographic camera projections
 #[derive(Default, Event)]
@@ -81,47 +83,48 @@ pub struct BlendyCamerasPlugin;
 
 impl Plugin for BlendyCamerasPlugin {
     fn build(&self, app: &mut App) {
-        if !app.is_plugin_added::<CursorRayPlugin>() {
-            app.add_plugins(CursorRayPlugin);
-        }
-        app.init_resource::<ActiveCameraData>()
-            .init_resource::<MouseKeyTracker>()
-            .init_resource::<ProjectionResource>()
-            .add_event::<SwitchProjection>()
-            .add_event::<SwitchToOrbitController>()
-            .add_event::<SwitchToFlyController>()
-            .add_event::<ViewpointEvent>()
-            .add_event::<FrameEvent>()
-            .add_systems(
-                PostUpdate,
-                (
-                    mouse_key_tracker_system,
-                    orbit_camera_controller_system,
-                    fly_camera_controller_system,
-                )
-                    .chain()
-                    .in_set(GuiFocusSystemSet)
-                    .in_set(BlendyCamerasSystemSet)
-                    .before(CameraUpdateSystem)
-                    .before(TransformSystem::TransformPropagate),
+        app.add_plugins(
+            DeferredRaycastingPlugin::<BlendyCamerasRaycastSet>::default(),
+        )
+        .init_resource::<ActiveCameraData>()
+        .init_resource::<MouseKeyTracker>()
+        .init_resource::<ProjectionResource>()
+        .add_event::<SwitchProjection>()
+        .add_event::<SwitchToOrbitController>()
+        .add_event::<SwitchToFlyController>()
+        .add_event::<ViewpointEvent>()
+        .add_event::<FrameEvent>()
+        .add_systems(Startup, startup_system)
+        .add_systems(
+            PostUpdate,
+            (
+                mouse_key_tracker_system,
+                orbit_camera_controller_system,
+                fly_camera_controller_system,
             )
-            .add_systems(
-                PostUpdate,
-                (
-                    active_viewport_data_system.run_if(
-                        |active_cam: Res<ActiveCameraData>| !active_cam.manual,
-                    ),
-                    wrap_grab_center_cursor_system
-                        .after(active_viewport_data_system),
-                    switch_to_fly_camera_controller_system,
-                    switch_to_orbit_camera_controller_system,
-                    switch_camera_projection_system,
-                    viewpoint_system,
-                    frame_system,
-                )
-                    .in_set(BlendyCamerasSystemSet)
-                    .before(GuiFocusSystemSet),
-            );
+                .chain()
+                .in_set(GuiFocusSystemSet)
+                .in_set(BlendyCamerasSystemSet)
+                .before(CameraUpdateSystem)
+                .before(TransformSystem::TransformPropagate),
+        )
+        .add_systems(
+            PostUpdate,
+            (
+                active_viewport_data_system.run_if(
+                    |active_cam: Res<ActiveCameraData>| !active_cam.manual,
+                ),
+                wrap_grab_center_cursor_system
+                    .after(active_viewport_data_system),
+                switch_to_fly_camera_controller_system,
+                switch_to_orbit_camera_controller_system,
+                switch_camera_projection_system,
+                viewpoint_system,
+                frame_system,
+            )
+                .in_set(BlendyCamerasSystemSet)
+                .before(GuiFocusSystemSet),
+        );
         #[cfg(feature = "bevy_egui")]
         {
             app.init_resource::<EguiWantsFocus>()

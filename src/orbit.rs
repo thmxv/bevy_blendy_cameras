@@ -1,10 +1,11 @@
 use std::f32::consts::PI;
 
-use bevy::prelude::*;
+use bevy::{ecs::component::StorageType, prelude::*};
 use bevy_mod_raycast::prelude::*;
 
 use crate::{
     input::{self, MouseKeyTracker},
+    raycast::BlendyCamerasRaycastSet,
     utils, ActiveCameraData,
 };
 
@@ -12,7 +13,6 @@ use crate::{
 /// and zooming.
 /// The entity must have `Transform` and `Projection` components. Typically
 /// you would add `Camera3dBundle` to this entity.
-#[derive(Component)]
 pub struct OrbitCameraController {
     /// The point the camera looks at. The camera also orbit around and zoom
     /// to that point if `auto_depth` and `zoom_to_mouse_position` are not set.
@@ -75,6 +75,30 @@ pub struct OrbitCameraController {
     pub force_update: bool,
 }
 
+impl Component for OrbitCameraController {
+    const STORAGE_TYPE: StorageType = StorageType::Table;
+
+    fn register_component_hooks(
+        hooks: &mut bevy::ecs::component::ComponentHooks,
+    ) {
+        hooks
+            .on_add(|mut world, entity, _component_id| {
+                world
+                    .commands()
+                    .entity(entity)
+                    .insert(
+                        RaycastSource::<BlendyCamerasRaycastSet>::new_cursor(),
+                    );
+            })
+            .on_remove(|mut world, entity, _component_id| {
+                world
+                    .commands()
+                    .entity(entity)
+                    .remove::<RaycastSource<BlendyCamerasRaycastSet>>();
+            });
+    }
+}
+
 impl Default for OrbitCameraController {
     fn default() -> Self {
         Self {
@@ -132,87 +156,90 @@ pub(crate) fn orbit_camera_controller_system(
     mut orbit_cameras: Query<(
         Entity,
         &mut OrbitCameraController,
+        &RaycastSource<BlendyCamerasRaycastSet>,
         &mut Transform,
         &mut Projection,
     )>,
-    mut raycast: Raycast,
-    cursor_ray: Res<CursorRay>,
     mut pivot_point: Local<Vec3>,
-    // mut gizmos: Gizmos,
+    //mut gizmos: Gizmos,
 ) {
-    for (entity, mut controller, mut transform, mut projection) in
-        orbit_cameras.iter_mut()
+    for (
+        entity,
+        mut controller,
+        raycast_source,
+        mut transform,
+        mut projection,
+    ) in orbit_cameras.iter_mut()
     {
-        // Update pivot point when needed
-        if (controller.auto_depth || controller.zoom_to_mouse_position)
-            && (input::orbit_just_pressed(
-                &controller,
-                &mouse_input,
-                &key_input,
-            ) || input::pan_just_pressed(
-                &controller,
-                &mouse_input,
-                &key_input,
-            ) || mouse_key_tracker.scroll_line != 0.0
-                || mouse_key_tracker.scroll_pixel != 0.0)
-        {
-            if let Some(cursor_ray) = **cursor_ray {
-                let hits1 = raycast.cast_ray(cursor_ray, &default());
-                if let Some(hit) = hits1.first().map(|(_, hit)| hit) {
-                    *pivot_point = hit.position();
-                    if controller.auto_depth {
-                        let camera_transform = match *projection {
-                            Projection::Perspective(_) => *transform,
-                            Projection::Orthographic(_) => {
-                                utils::camera_transform_form_orbit(
-                                    controller.yaw.unwrap(),
-                                    controller.pitch.unwrap(),
-                                    controller.radius.unwrap(),
-                                    controller.focus,
-                                )
-                            }
-                        };
-                        let camera_to_pivot =
-                            *pivot_point - camera_transform.translation;
-                        let pivot_distance = camera_to_pivot.length();
-                        let factor = camera_transform
-                            .forward()
-                            .dot(camera_to_pivot.normalize());
-                        let new_radius = pivot_distance * factor;
-                        let new_radius = new_radius.max(0.05);
-                        let new_focus = camera_transform.translation
-                            + (camera_transform.forward() * new_radius);
-                        if let Projection::Perspective(_) = *projection {
-                            controller.radius = Some(new_radius);
-                        }
-                        controller.focus = new_focus;
-                    }
-                } else {
-                    *pivot_point = match *projection {
-                        // NOTE: cursor_ray.origin is not the camera position
-                        // it is probably on the near plane
-                        Projection::Perspective(_) => {
-                            let factor = transform
-                                .forward()
-                                .dot(cursor_ray.direction.into());
-                            transform.translation
-                                + cursor_ray.direction
-                                    * (controller.radius.unwrap() / factor)
-                        }
-                        Projection::Orthographic(ref p) => {
-                            let radius_minus_near = (p.far - p.near) / 2.0;
-                            cursor_ray.origin
-                                + cursor_ray.direction * radius_minus_near
-                        }
-                    };
-                }
-            }
-        }
-
         controller.initialize_if_necessary(&mut transform, &mut projection);
-
         let mut has_moved = false;
         if controller.is_enabled && active_cam.entity == Some(entity) {
+            // Update pivot point when needed
+            if (controller.auto_depth || controller.zoom_to_mouse_position)
+                && (input::orbit_just_pressed(
+                    &controller,
+                    &mouse_input,
+                    &key_input,
+                ) || input::pan_just_pressed(
+                    &controller,
+                    &mouse_input,
+                    &key_input,
+                ) || mouse_key_tracker.scroll_line != 0.0
+                    || mouse_key_tracker.scroll_pixel != 0.0)
+            {
+                if let Some(cursor_ray) = raycast_source.get_ray() {
+                    if let Some((_entity, hit)) =
+                        raycast_source.get_nearest_intersection()
+                    {
+                        *pivot_point = hit.position();
+                        if controller.auto_depth {
+                            let camera_transform = match *projection {
+                                Projection::Perspective(_) => *transform,
+                                Projection::Orthographic(_) => {
+                                    utils::camera_transform_form_orbit(
+                                        controller.yaw.unwrap(),
+                                        controller.pitch.unwrap(),
+                                        controller.radius.unwrap(),
+                                        controller.focus,
+                                    )
+                                }
+                            };
+                            let camera_to_pivot =
+                                *pivot_point - camera_transform.translation;
+                            let pivot_distance = camera_to_pivot.length();
+                            let factor = camera_transform
+                                .forward()
+                                .dot(camera_to_pivot.normalize());
+                            let new_radius = pivot_distance * factor;
+                            let new_radius = new_radius.max(0.05);
+                            let new_focus = camera_transform.translation
+                                + (camera_transform.forward() * new_radius);
+                            if let Projection::Perspective(_) = *projection {
+                                controller.radius = Some(new_radius);
+                            }
+                            controller.focus = new_focus;
+                        }
+                    } else {
+                        *pivot_point = match *projection {
+                            // NOTE: cursor_ray.origin is not the camera
+                            // position it is probably on the near plane
+                            Projection::Perspective(_) => {
+                                let factor = transform
+                                    .forward()
+                                    .dot(cursor_ray.direction.into());
+                                transform.translation
+                                    + cursor_ray.direction
+                                        * (controller.radius.unwrap() / factor)
+                            }
+                            Projection::Orthographic(ref p) => {
+                                let radius_minus_near = (p.far - p.near) / 2.0;
+                                cursor_ray.origin
+                                    + cursor_ray.direction * radius_minus_near
+                            }
+                        };
+                    }
+                }
+            }
             let orbit = mouse_key_tracker.orbit * controller.orbit_sensitivity;
             let mut pan = mouse_key_tracker.pan * controller.pan_sensitivity;
             let scroll_line =
@@ -344,10 +371,20 @@ pub(crate) fn orbit_camera_controller_system(
                 }
                 has_moved = true;
             }
-        }
 
-        // gizmos.sphere(controller.focus, Quat::IDENTITY, 0.2, Color::AQUAMARINE);
-        // gizmos.sphere(*pivot_point, Quat::IDENTITY, 0.2, Color::ORANGE_RED);
+            //gizmos.sphere(
+            //    controller.focus,
+            //    Quat::IDENTITY,
+            //    0.2,
+            //    bevy::color::palettes::css::AQUAMARINE,
+            //);
+            //gizmos.sphere(
+            //    *pivot_point,
+            //    Quat::IDENTITY,
+            //    0.2,
+            //    bevy::color::palettes::css::ORANGE_RED,
+            //);
+        }
 
         // Update the camera's transform based on current values
         if let (Some(yaw), Some(pitch), Some(radius)) =
