@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Now the Pan/Orbit/Zoom controller works with multiple viewports
+
 ### Security
 
 ## [0.3.1] 
