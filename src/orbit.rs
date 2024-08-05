@@ -147,6 +147,197 @@ impl OrbitCameraController {
     }
 }
 
+fn orbit_camera(
+    controller: &mut Mut<OrbitCameraController>,
+    raycast_source: &RaycastSource<BlendyCamerasRaycastSet>,
+    transform: &Mut<Transform>,
+    projection: &Mut<Projection>,
+    active_cam: &Res<ActiveCameraData>,
+    key_input: &Res<ButtonInput<KeyCode>>,
+    mouse_input: &Res<ButtonInput<MouseButton>>,
+    mouse_key_tracker: &Res<MouseKeyTracker>,
+    pivot_point: &mut Local<Vec3>,
+) -> bool {
+    // Update pivot point when needed
+    if (controller.auto_depth || controller.zoom_to_mouse_position)
+        && (input::orbit_just_pressed(&controller, &mouse_input, &key_input)
+            || input::pan_just_pressed(&controller, &mouse_input, &key_input)
+            || mouse_key_tracker.scroll_line != 0.0
+            || mouse_key_tracker.scroll_pixel != 0.0)
+    {
+        if let Some(cursor_ray) = raycast_source.get_ray() {
+            if let Some((_entity, hit)) =
+                raycast_source.get_nearest_intersection()
+            {
+                **pivot_point = hit.position();
+                if controller.auto_depth {
+                    let camera_transform = match **projection {
+                        Projection::Perspective(_) => **transform,
+                        Projection::Orthographic(_) => {
+                            utils::camera_transform_form_orbit(
+                                controller.yaw.unwrap(),
+                                controller.pitch.unwrap(),
+                                controller.radius.unwrap(),
+                                controller.focus,
+                            )
+                        }
+                    };
+                    let camera_to_pivot =
+                        **pivot_point - camera_transform.translation;
+                    let pivot_distance = camera_to_pivot.length();
+                    let factor = camera_transform
+                        .forward()
+                        .dot(camera_to_pivot.normalize());
+                    let new_radius = pivot_distance * factor;
+                    let new_radius = new_radius.max(0.05);
+                    let new_focus = camera_transform.translation
+                        + (camera_transform.forward() * new_radius);
+                    if let Projection::Perspective(_) = **projection {
+                        controller.radius = Some(new_radius);
+                    }
+                    controller.focus = new_focus;
+                }
+            } else {
+                **pivot_point = match **projection {
+                    // NOTE: cursor_ray.origin is not the camera
+                    // position it is probably on the near plane
+                    Projection::Perspective(_) => {
+                        let factor = transform
+                            .forward()
+                            .dot(cursor_ray.direction.into());
+                        transform.translation
+                            + cursor_ray.direction
+                                * (controller.radius.unwrap() / factor)
+                    }
+                    Projection::Orthographic(ref p) => {
+                        let radius_minus_near = (p.far - p.near) / 2.0;
+                        cursor_ray.origin
+                            + cursor_ray.direction * radius_minus_near
+                    }
+                };
+            }
+        }
+    }
+    let orbit = mouse_key_tracker.orbit * controller.orbit_sensitivity;
+    let mut pan = mouse_key_tracker.pan * controller.pan_sensitivity;
+    let scroll_line =
+        mouse_key_tracker.scroll_line * controller.zoom_sensitivity;
+    let scroll_pixel =
+        mouse_key_tracker.scroll_pixel * controller.zoom_sensitivity;
+    let orbit_button_changed = mouse_key_tracker.orbit_button_changed;
+
+    if orbit_button_changed {
+        let up = transform.rotation * Vec3::Y;
+        controller.is_upside_down = up.y <= 0.0;
+    }
+    let mut has_moved = false;
+    // TODO: Draw a sceen space 2D disk for rotation center
+    if orbit.length_squared() > 0.0 {
+        // Use window size for rotation otherwise the sensitivity
+        // is far too high for small viewports
+        if let Some(win_size) = active_cam.window_size {
+            let delta_yaw = {
+                let delta = orbit.x / win_size.x * PI * 2.0;
+                if controller.is_upside_down {
+                    -delta
+                } else {
+                    delta
+                }
+            };
+            let delta_pitch = orbit.y / win_size.y * PI;
+            let pre_yaw = controller.yaw.unwrap();
+            let pre_pitch = controller.pitch.unwrap();
+            controller.yaw = controller.yaw.map(|value| value - delta_yaw);
+            controller.pitch =
+                controller.pitch.map(|value| value + delta_pitch);
+            if controller.auto_depth {
+                let mut transform_tmp = utils::camera_transform_form_orbit(
+                    pre_yaw,
+                    pre_pitch,
+                    controller.radius.unwrap(),
+                    controller.focus,
+                );
+                let yaw = Quat::from_rotation_y(-delta_yaw);
+                let pitch = Quat::from_rotation_x(-delta_pitch);
+                let pitch_global = transform_tmp.rotation
+                    * pitch
+                    * transform_tmp.rotation.inverse();
+                transform_tmp.rotate_around(**pivot_point, yaw * pitch_global);
+                controller.focus = transform_tmp.translation
+                    + (transform_tmp.forward() * controller.radius.unwrap());
+            }
+            has_moved = true;
+        }
+    }
+    if pan.length_squared() > 0.0 {
+        // Make panning distance independent of resolution and FOV,
+        if let Some(vp_size) = active_cam.viewport_size {
+            let mut multiplier = 1.0;
+            match **projection {
+                Projection::Perspective(ref p) => {
+                    pan *= Vec2::new(p.fov * p.aspect_ratio, p.fov) / vp_size;
+                    // Make panning proportional to distance away from
+                    // focus point
+                    if let Some(radius) = controller.radius {
+                        multiplier = radius;
+                    }
+                }
+                Projection::Orthographic(ref p) => {
+                    pan *= Vec2::new(p.area.width(), p.area.height()) / vp_size;
+                }
+            }
+            // Translate by local axes
+            let right = transform.rotation * Vec3::X * -pan.x;
+            let up = transform.rotation * Vec3::Y * pan.y;
+            let translation = (right + up) * multiplier;
+            controller.focus += translation;
+            has_moved = true;
+        }
+    }
+    if (scroll_line + scroll_pixel).abs() > 0.0 {
+        let old_radius = controller.radius.unwrap();
+        // Calculate the impact of scrolling on the reference value
+        let line_delta = -scroll_line * old_radius * 0.2;
+        let pixel_delta = -scroll_pixel * old_radius * 0.2;
+        let radius_delta = line_delta + pixel_delta;
+        // Update the target value
+        controller.radius = controller.radius.map(|value| value + radius_delta);
+        // If it is pixel-based scrolling, add it directly to the
+        // current value
+        // controller.radius =
+        //     controller.radius.map(|value| value + pixel_delta);
+        if controller.zoom_to_mouse_position {
+            // TODO: clean
+            match **projection {
+                Projection::Perspective(_) => {
+                    let old_camera_pos = transform.translation;
+                    let old_camera_to_pivot = **pivot_point - old_camera_pos;
+                    let mouse_direction = old_camera_to_pivot.normalize();
+                    let factor = transform.forward().dot(mouse_direction);
+                    let new_camera_pos = old_camera_pos
+                        + mouse_direction * (-radius_delta / factor);
+                    let new_focus = new_camera_pos
+                        + transform.forward() * controller.radius.unwrap();
+                    controller.focus = new_focus;
+                }
+                Projection::Orthographic(_) => {
+                    let focus_to_pivot = **pivot_point - controller.focus;
+                    let focus_to_pivot =
+                        transform.rotation.inverse() * focus_to_pivot;
+                    let focus_to_pivot = focus_to_pivot.xy();
+                    let focus_to_pivot = Vec3::from((focus_to_pivot, 0.0));
+                    let focus_to_pivot = transform.rotation * focus_to_pivot;
+                    let new_radius = controller.radius.unwrap();
+                    controller.focus +=
+                        focus_to_pivot * (1.0 - (new_radius / old_radius));
+                }
+            }
+        }
+        has_moved = true;
+    }
+    has_moved
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn orbit_camera_controller_system(
     active_cam: Res<ActiveCameraData>,
@@ -174,204 +365,17 @@ pub(crate) fn orbit_camera_controller_system(
         controller.initialize_if_necessary(&mut transform, &mut projection);
         let mut has_moved = false;
         if controller.is_enabled && active_cam.entity == Some(entity) {
-            // Update pivot point when needed
-            if (controller.auto_depth || controller.zoom_to_mouse_position)
-                && (input::orbit_just_pressed(
-                    &controller,
-                    &mouse_input,
-                    &key_input,
-                ) || input::pan_just_pressed(
-                    &controller,
-                    &mouse_input,
-                    &key_input,
-                ) || mouse_key_tracker.scroll_line != 0.0
-                    || mouse_key_tracker.scroll_pixel != 0.0)
-            {
-                if let Some(cursor_ray) = raycast_source.get_ray() {
-                    if let Some((_entity, hit)) =
-                        raycast_source.get_nearest_intersection()
-                    {
-                        *pivot_point = hit.position();
-                        if controller.auto_depth {
-                            let camera_transform = match *projection {
-                                Projection::Perspective(_) => *transform,
-                                Projection::Orthographic(_) => {
-                                    utils::camera_transform_form_orbit(
-                                        controller.yaw.unwrap(),
-                                        controller.pitch.unwrap(),
-                                        controller.radius.unwrap(),
-                                        controller.focus,
-                                    )
-                                }
-                            };
-                            let camera_to_pivot =
-                                *pivot_point - camera_transform.translation;
-                            let pivot_distance = camera_to_pivot.length();
-                            let factor = camera_transform
-                                .forward()
-                                .dot(camera_to_pivot.normalize());
-                            let new_radius = pivot_distance * factor;
-                            let new_radius = new_radius.max(0.05);
-                            let new_focus = camera_transform.translation
-                                + (camera_transform.forward() * new_radius);
-                            if let Projection::Perspective(_) = *projection {
-                                controller.radius = Some(new_radius);
-                            }
-                            controller.focus = new_focus;
-                        }
-                    } else {
-                        *pivot_point = match *projection {
-                            // NOTE: cursor_ray.origin is not the camera
-                            // position it is probably on the near plane
-                            Projection::Perspective(_) => {
-                                let factor = transform
-                                    .forward()
-                                    .dot(cursor_ray.direction.into());
-                                transform.translation
-                                    + cursor_ray.direction
-                                        * (controller.radius.unwrap() / factor)
-                            }
-                            Projection::Orthographic(ref p) => {
-                                let radius_minus_near = (p.far - p.near) / 2.0;
-                                cursor_ray.origin
-                                    + cursor_ray.direction * radius_minus_near
-                            }
-                        };
-                    }
-                }
-            }
-            let orbit = mouse_key_tracker.orbit * controller.orbit_sensitivity;
-            let mut pan = mouse_key_tracker.pan * controller.pan_sensitivity;
-            let scroll_line =
-                mouse_key_tracker.scroll_line * controller.zoom_sensitivity;
-            let scroll_pixel =
-                mouse_key_tracker.scroll_pixel * controller.zoom_sensitivity;
-            let orbit_button_changed = mouse_key_tracker.orbit_button_changed;
-
-            if orbit_button_changed {
-                let up = transform.rotation * Vec3::Y;
-                controller.is_upside_down = up.y <= 0.0;
-            }
-
-            // TODO: Draw a sceen space 2D disk for rotation center
-            if orbit.length_squared() > 0.0 {
-                // Use window size for rotation otherwise the sensitivity
-                // is far too high for small viewports
-                if let Some(win_size) = active_cam.window_size {
-                    let delta_yaw = {
-                        let delta = orbit.x / win_size.x * PI * 2.0;
-                        if controller.is_upside_down {
-                            -delta
-                        } else {
-                            delta
-                        }
-                    };
-                    let delta_pitch = orbit.y / win_size.y * PI;
-                    let pre_yaw = controller.yaw.unwrap();
-                    let pre_pitch = controller.pitch.unwrap();
-                    controller.yaw =
-                        controller.yaw.map(|value| value - delta_yaw);
-                    controller.pitch =
-                        controller.pitch.map(|value| value + delta_pitch);
-                    if controller.auto_depth {
-                        let mut transform_tmp =
-                            utils::camera_transform_form_orbit(
-                                pre_yaw,
-                                pre_pitch,
-                                controller.radius.unwrap(),
-                                controller.focus,
-                            );
-                        let yaw = Quat::from_rotation_y(-delta_yaw);
-                        let pitch = Quat::from_rotation_x(-delta_pitch);
-                        let pitch_global = transform_tmp.rotation
-                            * pitch
-                            * transform_tmp.rotation.inverse();
-                        transform_tmp
-                            .rotate_around(*pivot_point, yaw * pitch_global);
-                        controller.focus = transform_tmp.translation
-                            + (transform_tmp.forward()
-                                * controller.radius.unwrap());
-                    }
-                    has_moved = true;
-                }
-            }
-            if pan.length_squared() > 0.0 {
-                // Make panning distance independent of resolution and FOV,
-                if let Some(vp_size) = active_cam.viewport_size {
-                    let mut multiplier = 1.0;
-                    match *projection {
-                        Projection::Perspective(ref p) => {
-                            pan *= Vec2::new(p.fov * p.aspect_ratio, p.fov)
-                                / vp_size;
-                            // Make panning proportional to distance away from
-                            // focus point
-                            if let Some(radius) = controller.radius {
-                                multiplier = radius;
-                            }
-                        }
-                        Projection::Orthographic(ref p) => {
-                            pan *= Vec2::new(p.area.width(), p.area.height())
-                                / vp_size;
-                        }
-                    }
-                    // Translate by local axes
-                    let right = transform.rotation * Vec3::X * -pan.x;
-                    let up = transform.rotation * Vec3::Y * pan.y;
-                    let translation = (right + up) * multiplier;
-                    controller.focus += translation;
-                    has_moved = true;
-                }
-            }
-            if (scroll_line + scroll_pixel).abs() > 0.0 {
-                let old_radius = controller.radius.unwrap();
-                // Calculate the impact of scrolling on the reference value
-                let line_delta = -scroll_line * old_radius * 0.2;
-                let pixel_delta = -scroll_pixel * old_radius * 0.2;
-                let radius_delta = line_delta + pixel_delta;
-                // Update the target value
-                controller.radius =
-                    controller.radius.map(|value| value + radius_delta);
-                // If it is pixel-based scrolling, add it directly to the
-                // current value
-                // controller.radius =
-                //     controller.radius.map(|value| value + pixel_delta);
-                if controller.zoom_to_mouse_position {
-                    // TODO: clean
-                    match *projection {
-                        Projection::Perspective(_) => {
-                            let old_camera_pos = transform.translation;
-                            let old_camera_to_pivot =
-                                *pivot_point - old_camera_pos;
-                            let mouse_direction =
-                                old_camera_to_pivot.normalize();
-                            let factor =
-                                transform.forward().dot(mouse_direction);
-                            let new_camera_pos = old_camera_pos
-                                + mouse_direction * (-radius_delta / factor);
-                            let new_focus = new_camera_pos
-                                + transform.forward()
-                                    * controller.radius.unwrap();
-                            controller.focus = new_focus;
-                        }
-                        Projection::Orthographic(_) => {
-                            let focus_to_pivot =
-                                *pivot_point - controller.focus;
-                            let focus_to_pivot =
-                                transform.rotation.inverse() * focus_to_pivot;
-                            let focus_to_pivot = focus_to_pivot.xy();
-                            let focus_to_pivot =
-                                Vec3::from((focus_to_pivot, 0.0));
-                            let focus_to_pivot =
-                                transform.rotation * focus_to_pivot;
-                            let new_radius = controller.radius.unwrap();
-                            controller.focus += focus_to_pivot
-                                * (1.0 - (new_radius / old_radius));
-                        }
-                    }
-                }
-                has_moved = true;
-            }
-
+            has_moved = orbit_camera(
+                &mut controller,
+                raycast_source,
+                &transform,
+                &projection,
+                &active_cam,
+                &key_input,
+                &mouse_input,
+                &mouse_key_tracker,
+                &mut pivot_point,
+            );
             //gizmos.sphere(
             //    controller.focus,
             //    Quat::IDENTITY,
@@ -385,7 +389,6 @@ pub(crate) fn orbit_camera_controller_system(
             //    bevy::color::palettes::css::ORANGE_RED,
             //);
         }
-
         // Update the camera's transform based on current values
         if let (Some(yaw), Some(pitch), Some(radius)) =
             (controller.yaw, controller.pitch, controller.radius)
