@@ -1,8 +1,11 @@
-//! Full egui example with egui_dock. Does not work well ATM
+//! Full egui example with egui_dock
 
 use std::collections::HashMap;
 
-use bevy::{prelude::*, render::camera::Viewport, window::PrimaryWindow};
+use bevy::{
+    prelude::*, render::camera::Viewport, window::PrimaryWindow,
+    winit::WinitSettings,
+};
 use bevy_blendy_cameras::{
     BlendyCamerasPlugin, FlyCameraController, OrbitCameraController,
 };
@@ -14,6 +17,7 @@ fn main() {
     app.add_plugins(DefaultPlugins)
         .add_plugins(EguiPlugin)
         .add_plugins(BlendyCamerasPlugin)
+        .insert_resource(WinitSettings::desktop_app())
         .insert_resource(UiState::new())
         .add_systems(Startup, setup_system)
         .add_systems(Update, gui_system)
@@ -33,7 +37,7 @@ enum DockTab {
 #[derive(Resource)]
 struct UiState {
     dock_state: DockState<DockTab>,
-    viewport_rects: HashMap<u32, egui::Rect>,
+    viewport_rects: HashMap<u32, Option<egui::Rect>>,
 }
 
 impl UiState {
@@ -46,14 +50,16 @@ impl UiState {
             tree.split_right(first_v3d, 0.5, vec![DockTab::View3D(1)]);
         Self {
             dock_state: state,
-            viewport_rects: HashMap::from([
-                (0, egui::Rect::NOTHING),
-                (1, egui::Rect::NOTHING),
-            ]),
+            viewport_rects: HashMap::from([(0, None), (1, None)]),
         }
     }
 
     fn ui(&mut self, ctx: &mut egui::Context) {
+        // Reset viewports rects to None in case one viewport is not visible
+        self.viewport_rects
+            .values_mut()
+            .map(|viewport_rect| *viewport_rect = None)
+            .count();
         let mut tab_viewer = TabViewer {
             viewport_rects: &mut self.viewport_rects,
         };
@@ -64,7 +70,7 @@ impl UiState {
 }
 
 struct TabViewer<'a> {
-    viewport_rects: &'a mut HashMap<u32, egui::Rect>,
+    viewport_rects: &'a mut HashMap<u32, Option<egui::Rect>>,
 }
 
 impl egui_dock::TabViewer for TabViewer<'_> {
@@ -73,7 +79,7 @@ impl egui_dock::TabViewer for TabViewer<'_> {
     fn ui(&mut self, ui: &mut egui_dock::egui::Ui, tab: &mut Self::Tab) {
         match tab {
             DockTab::View3D(n) => {
-                self.viewport_rects.insert(*n, ui.clip_rect());
+                self.viewport_rects.insert(*n, Some(ui.clip_rect()));
                 // TODO:
             }
             DockTab::Other => {
@@ -108,6 +114,11 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             DockTab::View3D(_) => false,
             _ => true,
         }
+    }
+
+    fn on_close(&mut self, _tab: &mut Self::Tab) -> bool {
+        // TODO: Remove rect, camera, ...
+        true
     }
 }
 
@@ -156,11 +167,9 @@ fn setup_system(
         Camera3dBundle {
             transform: Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
             camera: Camera {
-                // Renders the minimap camera after the main camera, so it is
-                // rendered on top
                 order: 1,
-                // Don't clear on the second camera because the first camera
-                // already cleared the window
+                // Clear on the second camera because the first camera might 
+                // not be visible and did not cleared the window
                 //clear_color: ClearColorConfig::None,
                 ..default()
             },
@@ -194,28 +203,39 @@ fn set_cameras_viewports_system(
     for (mut cam, viewport_camera) in &mut cameras {
         let viewport_rect =
             ui_state.viewport_rects.get(&viewport_camera.0).unwrap();
-        let viewport_pos = viewport_rect.left_top().to_vec2() * scale_factor;
-        let viewport_size = viewport_rect.size() * scale_factor;
+        if let Some(viewport_rect) = viewport_rect {
+            let viewport_pos =
+                viewport_rect.left_top().to_vec2() * scale_factor;
+            let viewport_size = viewport_rect.size() * scale_factor;
 
-        let physical_position =
-            UVec2::new(viewport_pos.x as u32, viewport_pos.y as u32);
-        let physical_size =
-            UVec2::new(viewport_size.x as u32, viewport_size.y as u32);
+            let physical_position =
+                UVec2::new(viewport_pos.x as u32, viewport_pos.y as u32);
+            let physical_size =
+                UVec2::new(viewport_size.x as u32, viewport_size.y as u32);
 
-        // The desired viewport rectangle at its offset in "physical pixel
-        // space"
-        let rect = physical_position + physical_size;
+            // The desired viewport rectangle at its offset in "physical pixel
+            // space"
+            let rect = physical_position + physical_size;
 
-        let window_size = window.physical_size();
-        // wgpu will panic if trying to set a viewport rect which has
-        // coordinates extending past the size of the render target, i.e. the
-        // physical window in our case. Typically this shouldn't happen- but
-        // during init and resizing etc. edge cases might occur. Simply do
-        // nothing in those cases.
-        if rect.x <= window_size.x && rect.y <= window_size.y {
+            let window_size = window.physical_size();
+            // wgpu will panic if trying to set a viewport rect which has
+            // coordinates extending past the size of the render target, i.e. the
+            // physical window in our case. Typically this shouldn't happen- but
+            // during init and resizing etc. edge cases might occur. Simply do
+            // nothing in those cases.
+            if rect.x <= window_size.x && rect.y <= window_size.y {
+                cam.is_active = true;
+                cam.viewport = Some(Viewport {
+                    physical_position,
+                    physical_size,
+                    depth: 0.0..1.0,
+                });
+            }
+        } else {
+            cam.is_active = false;
             cam.viewport = Some(Viewport {
-                physical_position,
-                physical_size,
+                physical_position: UVec2::ZERO,
+                physical_size: UVec2::ZERO,
                 depth: 0.0..1.0,
             });
         }
