@@ -168,7 +168,7 @@ fn setup_system(
             transform: Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
             camera: Camera {
                 order: 1,
-                // Clear on the second camera because the first camera might 
+                // Clear on the second camera because the first camera might
                 // not be visible and did not cleared the window
                 //clear_color: ClearColorConfig::None,
                 ..default()

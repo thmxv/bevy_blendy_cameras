@@ -5,7 +5,7 @@ use bevy_mod_raycast::deferred::RaycastMesh;
 pub(crate) struct BlendyCamerasRaycastSet;
 
 /// Make all the entites with a mesh a raycast target
-pub(crate) fn startup_system(world: &mut World) {
+pub(crate) fn add_raycast_hooks(world: &mut World) {
     world
         .register_component_hooks::<Handle<Mesh>>()
         .on_add(|mut world, entity, _component_id| {
@@ -21,4 +21,3 @@ pub(crate) fn startup_system(world: &mut World) {
                 .remove::<RaycastMesh<BlendyCamerasRaycastSet>>();
         });
 }
-

@@ -5,8 +5,10 @@ use crate::{fly::FlyCameraController, orbit::OrbitCameraController, utils};
 /// Event to move the camera to frame certain entities
 #[derive(Event)]
 pub struct FrameEvent {
+    /// Camera to be used for framing
+    pub camera_entity: Entity,
     /// Entities to frames
-    pub entities: Vec<Entity>,
+    pub entities_to_be_framed: Vec<Entity>,
     /// Also frame children of entities
     pub include_children: bool,
 }
@@ -25,7 +27,8 @@ fn get_entities_aabb(
         |(a_min, a_max): (Vec3, Vec3), (b_min, b_max): (Vec3, Vec3)| {
             (a_min.min(b_min), a_max.max(b_max))
         };
-    let default_bounds = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
+    let default_bounds =
+        (Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY));
     entities
         .iter()
         .filter_map(|&entity| {
@@ -76,43 +79,47 @@ pub(crate) fn frame_system(
         (Without<OrbitCameraController>, Without<FlyCameraController>),
     >,
 ) {
-    for ev in ev_read.read() {
-        let FrameEvent {
-            entities,
-            include_children,
-        } = ev;
-        let (bounds_min, bounds_max) =
-            get_entities_aabb(entities, *include_children, &entities_query);
-        let aabb_diag = bounds_max - bounds_min;
-        let aabb_diag = if aabb_diag.max_element() > 0.0 {
-            aabb_diag
-        } else {
-            warn!(
-                "Could not focus because entities (and children) do not \
-                  have any AABB"
-            );
-            continue;
-        };
-        let aabb_center = bounds_min + aabb_diag * 0.5;
-        let aabb_radius = aabb_diag.length();
-        // TODO: Calculate distance acording to view angle (if projection is
-        // perspective). Also (in perspective) center on the projection of
-        // the object. For the moment we center on the AABB center but the
-        // object is not centered in the view if viewed diagonaly.
-        // For the moment just multiply distance to center to make sure all the
-        // object is into view.
-        let distance_camera_to_aabb_center = 1.5 * aabb_radius;
-        let distance_camera_to_aabb_center =
-            distance_camera_to_aabb_center.max(0.05);
-
-        for (
+    for FrameEvent {
+        camera_entity,
+        entities_to_be_framed,
+        include_children,
+    } in ev_read.read()
+    {
+        if let Ok((
             // entity,
             mut transform,
             orbit_controller_opt,
             fly_controller_opt,
             mut projection,
-        ) in cameras_query.iter_mut()
+        )) = cameras_query.get_mut(*camera_entity)
         {
+            let (bounds_min, bounds_max) = get_entities_aabb(
+                entities_to_be_framed,
+                *include_children,
+                &entities_query,
+            );
+            let aabb_diag = bounds_max - bounds_min;
+            let aabb_diag = if aabb_diag.max_element() > 0.0 {
+                aabb_diag
+            } else {
+                warn!(
+                    "Could not focus because entities (and children) do not \
+                     have any AABB"
+                );
+                continue;
+            };
+            let aabb_center = bounds_min + aabb_diag * 0.5;
+            let aabb_radius = aabb_diag.length();
+            // TODO: Calculate distance acording to view angle (if projection is
+            // perspective). Also (in perspective) center on the projection of
+            // the object. For the moment we center on the AABB center but the
+            // object is not centered in the view if viewed diagonaly.
+            // For the moment just multiply distance to center to make sure all
+            // the object is into view.
+            let distance_camera_to_aabb_center = 1.3 * aabb_radius;
+            let distance_camera_to_aabb_center =
+                distance_camera_to_aabb_center.max(0.05);
+
             if let Some(mut controller) = orbit_controller_opt {
                 // NOTE: Checking if viewport is active does not work if
                 // no manual manipulation of the camera is done a priory.
@@ -142,6 +149,8 @@ pub(crate) fn frame_system(
                         + (transform.back() * distance_camera_to_aabb_center);
                 }
             }
+        } else {
+            warn!("Camera not found while trying to frame view");
         }
     }
 }

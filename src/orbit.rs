@@ -1,12 +1,14 @@
 use std::f32::consts::PI;
 
-use bevy::{ecs::component::StorageType, prelude::*};
+use bevy::{
+    ecs::component::StorageType, prelude::*, render::camera::ScalingMode,
+};
 use bevy_mod_raycast::prelude::*;
 
 use crate::{
     input::{self, MouseKeyTracker},
     raycast::BlendyCamerasRaycastSet,
-    utils, ActiveCameraData,
+    utils, ActiveCameraData, OtherProjection,
 };
 
 /// Component to tag an entiy as able to be controlled by orbiting, panning
@@ -83,9 +85,25 @@ impl Component for OrbitCameraController {
     ) {
         hooks
             .on_add(|mut world, entity, _component_id| {
+                let projection = world.get::<Projection>(entity).unwrap();
+                let projection = match projection {
+                    Projection::Perspective(_) => {
+                        Projection::Orthographic(OrthographicProjection {
+                            scaling_mode: ScalingMode::FixedVertical(1.0),
+                            ..default()
+                        })
+                    }
+                    Projection::Orthographic(_) => {
+                        Projection::Perspective(PerspectiveProjection {
+                            ..default()
+                        })
+                    }
+                };
                 world
                     .commands()
                     .entity(entity)
+                    .insert(OtherProjection(projection))
+                    // TODO: Only insert if camera is active
                     .insert(
                         RaycastSource::<BlendyCamerasRaycastSet>::new_cursor(),
                     );
@@ -94,7 +112,8 @@ impl Component for OrbitCameraController {
                 world
                     .commands()
                     .entity(entity)
-                    .remove::<RaycastSource<BlendyCamerasRaycastSet>>();
+                    .remove::<RaycastSource<BlendyCamerasRaycastSet>>()
+                    .remove::<OtherProjection>();
             });
     }
 }
@@ -147,6 +166,7 @@ impl OrbitCameraController {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn orbit_camera(
     controller: &mut Mut<OrbitCameraController>,
     raycast_source: &RaycastSource<BlendyCamerasRaycastSet>,
@@ -160,8 +180,8 @@ fn orbit_camera(
 ) -> bool {
     // Update pivot point when needed
     if (controller.auto_depth || controller.zoom_to_mouse_position)
-        && (input::orbit_just_pressed(&controller, &mouse_input, &key_input)
-            || input::pan_just_pressed(&controller, &mouse_input, &key_input)
+        && (input::orbit_just_pressed(controller, mouse_input, key_input)
+            || input::pan_just_pressed(controller, mouse_input, key_input)
             || mouse_key_tracker.scroll_line != 0.0
             || mouse_key_tracker.scroll_pixel != 0.0)
     {

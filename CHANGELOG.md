@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Make modules private and used types public
+- Events now needs the camera entity parameters to indicate which camera must
+  be changed
 
 ### Deprecated
 
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Now the Pan/Orbit/Zoom controller works with multiple viewports
+- The events now suports mutliple cameras/viewports
 
 ### Security
 

@@ -14,7 +14,7 @@
 use bevy::{
     input::{keyboard::KeyCode, mouse::MouseWheel, ButtonInput},
     prelude::*,
-    render::camera::{CameraUpdateSystem, RenderTarget, ScalingMode},
+    render::camera::{CameraUpdateSystem, RenderTarget},
     transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow, WindowRef},
     winit::WinitWindows,
@@ -31,7 +31,7 @@ use crate::{
     frame::frame_system,
     input::{mouse_key_tracker_system, MouseKeyTracker},
     orbit::orbit_camera_controller_system,
-    raycast::startup_system,
+    raycast::add_raycast_hooks,
     viewpoints::viewpoint_system,
 };
 pub use crate::{
@@ -52,23 +52,32 @@ mod utils;
 mod viewpoints;
 
 /// Event to switch between perspective and ortographic camera projections
-#[derive(Default, Event)]
-pub struct SwitchProjection;
+#[derive(Event)]
+pub struct SwitchProjection {
+    /// The camera entity for switch to change the view projection
+    pub camera_entity: Entity,
+}
 
 /// Event to enable the [`OrbitCameraController`] and disable the
 /// [`FlyCameraController`] if present
-#[derive(Default, Event)]
-pub struct SwitchToOrbitController;
+#[derive(Event)]
+pub struct SwitchToOrbitController {
+    /// The camera entity to switch to pan/orbit/zoom control mode
+    pub camera_entity: Entity,
+}
 
 /// Event to enable the [`FlyCameraController`] and disable the
 /// [`OrbitCameraController`] if present
-#[derive(Default, Event)]
-pub struct SwitchToFlyController;
+#[derive(Event)]
+pub struct SwitchToFlyController {
+    /// The camera entity to switch to fly control mode
+    pub camera_entity: Entity,
+}
 
-/// Resource that contains the saved camera projection (orthographic,
+/// Component that contains the saved camera projection (orthographic,
 /// perspective) to be switched to when switching camera projection
-#[derive(Resource, Default)]
-pub struct ProjectionResource(Option<Projection>);
+#[derive(Component)]
+pub(crate) struct OtherProjection(Projection);
 
 /// System set to allow ordering
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
@@ -88,7 +97,6 @@ impl Plugin for BlendyCamerasPlugin {
         )
         .init_resource::<ActiveCameraData>()
         .init_resource::<MouseKeyTracker>()
-        .init_resource::<ProjectionResource>()
         .add_event::<SwitchProjection>()
         .add_event::<SwitchToOrbitController>()
         .add_event::<SwitchToFlyController>()
@@ -149,7 +157,7 @@ impl Plugin for BlendyCamerasPlugin {
 /// Tracks which `PanOrbitCamera` is active (should handle input events),
 /// along with the window and viewport dimensions, which are used for scaling
 /// mouse motion.
-/// `PanOrbitCameraPlugin` manages this resource automatically, in order to
+/// `BlendyCamerasPlugin` manages this resource automatically, in order to
 /// support multiple viewports/windows. However, if this doesn't work for you,
 /// you can take over and manage it yourself, e.g. when you want to control a
 /// camera that is rendering to a texture.
@@ -182,6 +190,91 @@ pub struct ActiveCameraData {
     pub window_entity: Option<Entity>,
 }
 
+fn startup_system(world: &mut World) {
+    add_raycast_hooks(world);
+}
+
+// TODO: Rename
+fn get_window_if_cursor_in_camera_viewport<'q>(
+    camera: &Camera,
+    touches: Option<&Res<Touches>>,
+    primary_window: &'q Query<(Entity, &Window), With<PrimaryWindow>>,
+    other_windows: &'q Query<(Entity, &Window), Without<PrimaryWindow>>,
+) -> Option<(Entity, &'q Window)> {
+    // First check if cursor is in the same window as this camera
+    if let RenderTarget::Window(win_ref) = camera.target {
+        let Some((window_entity, window)) = (match win_ref {
+            WindowRef::Primary => primary_window.get_single().ok(),
+            WindowRef::Entity(entity) => other_windows.get(entity).ok(),
+        }) else {
+            // Window does not exist - maybe it was closed and the
+            // camera not cleaned up
+            return None;
+        };
+        // Is the cursor/touch in this window?
+        // Note: there's a bug in winit that causes
+        // `window.cursor_position()` to return a `Some` value even if
+        // the cursor is not in this window, in very specific cases.
+        // See: https://github.com/Plonq/bevy_panorbit_camera/issues/22
+        if let Some(input_position) = window.cursor_position().or(touches
+            .map_or_else(
+                || None,
+                |v| {
+                    v.iter_just_pressed()
+                        .collect::<Vec<_>>()
+                        .first()
+                        .map(|touch| touch.position())
+                },
+            ))
+        {
+            // Now check if cursor is within this camera's viewport
+            if let Some(Rect { min, max }) = camera.logical_viewport_rect() {
+                // Window coordinates have Y starting at the bottom, so
+                // we need to reverse the y component before comparing
+                // with the viewport rect
+                let cursor_in_vp = input_position.x > min.x
+                    && input_position.x < max.x
+                    && input_position.y > min.y
+                    && input_position.y < max.y;
+                if cursor_in_vp {
+                    return Some((window_entity, window));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Get the camera entity that renders to the viewport under the mouse
+/// cursor with highest rendering order.
+pub fn get_camera_entity_from_cursor_position(
+    cameras_query: &Query<(Entity, &Camera)>,
+    primary_window: &Query<(Entity, &Window), With<PrimaryWindow>>,
+    other_windows: &Query<(Entity, &Window), Without<PrimaryWindow>>,
+) -> Option<Entity> {
+    let mut camera_entity = None;
+    let mut max_cam_order = 0;
+    for (entity, camera) in cameras_query.iter() {
+        if get_window_if_cursor_in_camera_viewport(
+            camera,
+            None,
+            primary_window,
+            other_windows,
+        )
+        .is_some()
+        {
+            // Only set if camera order is higher. This may
+            // overwrite a previous value in the case the viewport
+            // is overlapping another viewport.
+            if camera.order >= max_cam_order {
+                camera_entity = Some(entity);
+                max_cam_order = camera.order;
+            }
+        }
+    }
+    camera_entity
+}
+
 /// Gather data about the active viewport, i.e. the viewport the user is
 /// interacting with.
 /// Enables multiple viewports/windows.
@@ -192,8 +285,8 @@ fn active_viewport_data_system(
     key_input: Res<ButtonInput<KeyCode>>,
     scroll_events: EventReader<MouseWheel>,
     touches: Res<Touches>,
-    mut primary_windows: Query<(Entity, &mut Window), With<PrimaryWindow>>,
-    mut other_windows: Query<(Entity, &mut Window), Without<PrimaryWindow>>,
+    primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
+    other_windows: Query<(Entity, &Window), Without<PrimaryWindow>>,
     orbit_fly_cameras: Query<(
         Entity,
         &Camera,
@@ -245,63 +338,29 @@ fn active_viewport_data_system(
                     == touches.iter().count());
         if input_just_activated {
             has_input = true;
-            // First check if cursor is in the same window as this camera
-            if let RenderTarget::Window(win_ref) = camera.target {
-                let Some((window_entity, window)) = (match win_ref {
-                    WindowRef::Primary => primary_windows
-                        .get_single_mut()
-                        .ok()
-                        .map(|v| (v.0, v.1.into_inner())),
-                    WindowRef::Entity(entity) => other_windows
-                        .get_mut(entity)
-                        .ok()
-                        .map(|v| (v.0, v.1.into_inner())),
-                }) else {
-                    // Window does not exist - maybe it was closed and the
-                    // camera not cleaned up
-                    continue;
-                };
-                // Is the cursor/touch in this window?
-                // Note: there's a bug in winit that causes
-                // `window.cursor_position()` to return a `Some` value even if
-                // the cursor is not in this window, in very specific cases.
-                // See: https://github.com/Plonq/bevy_panorbit_camera/issues/22
-                if let Some(input_position) =
-                    window.cursor_position().or(touches
-                        .iter_just_pressed()
-                        .collect::<Vec<_>>()
-                        .first()
-                        .map(|touch| touch.position()))
-                {
-                    // Now check if cursor is within this camera's viewport
-                    if let Some(Rect { min, max }) =
-                        camera.logical_viewport_rect()
-                    {
-                        // Window coordinates have Y starting at the bottom, so
-                        // we need to reverse the y component before comparing
-                        // with the viewport rect
-                        let cursor_in_vp = input_position.x > min.x
-                            && input_position.x < max.x
-                            && input_position.y > min.y
-                            && input_position.y < max.y;
-
-                        // Only set if camera order is higher. This may
-                        // overwrite a previous value in the case the viewport
-                        // is overlapping another viewport.
-                        if cursor_in_vp && camera.order >= max_cam_order {
-                            new_resource = ActiveCameraData {
-                                entity: Some(entity),
-                                viewport_size: camera.logical_viewport_size(),
-                                window_size: Some(Vec2::new(
-                                    window.width(),
-                                    window.height(),
-                                )),
-                                manual: false,
-                                window_entity: Some(window_entity),
-                            };
-                            max_cam_order = camera.order;
-                        }
-                    }
+            if let Some((window_entity, window)) =
+                get_window_if_cursor_in_camera_viewport(
+                    camera,
+                    Some(&touches),
+                    &primary_window,
+                    &other_windows,
+                )
+            {
+                // Only set if camera order is higher. This may
+                // overwrite a previous value in the case the viewport
+                // is overlapping another viewport.
+                if camera.order >= max_cam_order {
+                    new_resource = ActiveCameraData {
+                        entity: Some(entity),
+                        viewport_size: camera.logical_viewport_size(),
+                        window_size: Some(Vec2::new(
+                            window.width(),
+                            window.height(),
+                        )),
+                        manual: false,
+                        window_entity: Some(window_entity),
+                    };
+                    max_cam_order = camera.order;
                 }
             }
         }
@@ -481,58 +540,65 @@ fn switch_to_orbit_camera_controller_system(
         &mut FlyCameraController,
     )>,
 ) {
-    for _ev in ev_read.read() {
-        let Ok((transform, mut orbit_controller, mut fly_controller)) =
-            query.get_single_mut()
-        else {
-            return;
-        };
-        if fly_controller.is_enabled {
-            fly_controller.is_enabled = false;
-            orbit_controller.is_enabled = true;
-            let (yaw, pitch, _roll) =
-                transform.rotation.to_euler(EulerRot::YXZ);
-            orbit_controller.yaw = Some(yaw);
-            orbit_controller.pitch = Some(-pitch);
-            orbit_controller.focus = transform.translation
-                + (transform.forward() * orbit_controller.radius.unwrap());
+    for SwitchToOrbitController { camera_entity } in ev_read.read() {
+        if let Ok((transform, mut orbit_controller, mut fly_controller)) =
+            query.get_mut(*camera_entity)
+        {
+            if fly_controller.is_enabled {
+                fly_controller.is_enabled = false;
+                orbit_controller.is_enabled = true;
+                let (yaw, pitch, _roll) =
+                    transform.rotation.to_euler(EulerRot::YXZ);
+                orbit_controller.yaw = Some(yaw);
+                orbit_controller.pitch = Some(-pitch);
+                orbit_controller.focus = transform.translation
+                    + (transform.forward() * orbit_controller.radius.unwrap());
+            }
+        } else {
+            warn!(
+                "Camera not found while trying to swith to OrbitCameraController"
+            );
         }
     }
 }
 
 fn switch_to_fly_camera_controller_system(
-    mut next_projection: ResMut<ProjectionResource>,
     mut ev_read: EventReader<SwitchToFlyController>,
     mut query: Query<(
         &mut Transform,
         &mut OrbitCameraController,
         &mut FlyCameraController,
         &mut Projection,
+        &mut OtherProjection,
     )>,
 ) {
-    for _ev in ev_read.read() {
-        let Ok((
+    for SwitchToFlyController { camera_entity } in ev_read.read() {
+        if let Ok((
             mut transform,
             mut orbit_controller,
             mut fly_controller,
             mut projection,
-        )) = query.get_single_mut()
-        else {
-            return;
-        };
-        if orbit_controller.is_enabled {
-            orbit_controller.is_enabled = false;
-            fly_controller.is_enabled = true;
-            // FIXME: commenting this makes fly mode works with ortho too
-            // but zoom and sensitivity behave wierdly
-            if let Projection::Orthographic(_) = *projection {
-                switch_camera_projection(
-                    &orbit_controller,
-                    &mut transform,
-                    &mut next_projection.0,
-                    &mut projection,
-                );
+            mut next_projection,
+        )) = query.get_mut(*camera_entity)
+        {
+            if orbit_controller.is_enabled {
+                orbit_controller.is_enabled = false;
+                fly_controller.is_enabled = true;
+                // FIXME: commenting this makes fly mode works with ortho too
+                // but zoom and sensitivity behave wierdly
+                if let Projection::Orthographic(_) = *projection {
+                    switch_camera_projection(
+                        &orbit_controller,
+                        &mut transform,
+                        &mut next_projection.0,
+                        &mut projection,
+                    );
+                }
             }
+        } else {
+            warn!(
+                "Camera not found while trying to swith to FlyCameraController"
+            );
         }
     }
 }
@@ -540,62 +606,54 @@ fn switch_to_fly_camera_controller_system(
 fn switch_camera_projection(
     orbit_controller: &OrbitCameraController,
     transform: &mut Transform,
-    next_projection: &mut Option<Projection>,
+    next_projection: &mut Projection,
     projection: &mut Projection,
 ) {
-    if next_projection.is_none() {
-        *next_projection = match projection {
-            Projection::Perspective(_) => {
-                Some(Projection::Orthographic(OrthographicProjection {
-                    scaling_mode: ScalingMode::FixedVertical(1.0),
-                    ..default()
-                }))
-            }
-            Projection::Orthographic(_) => {
-                Some(Projection::Perspective(PerspectiveProjection {
-                    ..default()
-                }))
-            }
-        }
-    }
-    if let Some(next) = next_projection {
-        // Need to update transform/projection
-        utils::update_orbit_transform(
-            orbit_controller.yaw.unwrap(),
-            orbit_controller.pitch.unwrap(),
-            orbit_controller.radius.unwrap(),
-            orbit_controller.focus,
-            transform,
-            next,
-        );
-        std::mem::swap(next, projection);
-    }
+    // Need to update transform/projection
+    utils::update_orbit_transform(
+        orbit_controller.yaw.unwrap(),
+        orbit_controller.pitch.unwrap(),
+        orbit_controller.radius.unwrap(),
+        orbit_controller.focus,
+        transform,
+        next_projection,
+    );
+    std::mem::swap(next_projection, projection);
 }
 
 fn switch_camera_projection_system(
-    mut next_projection: ResMut<ProjectionResource>,
     mut ev_read: EventReader<SwitchProjection>,
     mut query: Query<(
         &mut Transform,
-        &mut OrbitCameraController,
+        &OrbitCameraController,
         &mut Projection,
+        &mut OtherProjection,
     )>,
 ) {
-    for _ev in ev_read.read() {
+    for SwitchProjection { camera_entity } in ev_read.read() {
         trace!("Camera projection switch");
-        // Do not switch if in fly mode, which only work in perspective for now
-        let Ok((mut transform, orbit_controller, mut projection)) =
-            query.get_single_mut()
-        else {
-            return;
-        };
-        if orbit_controller.is_enabled {
-            switch_camera_projection(
-                &orbit_controller,
-                &mut transform,
-                &mut next_projection.0,
-                &mut projection,
-            );
+        if let Ok((
+            mut transform,
+            orbit_controller,
+            mut projection,
+            mut next_projection,
+        )) = query.get_mut(*camera_entity)
+        {
+            // Do not switch if in fly mode, which only work in perspective
+            // for now
+            // FIXME: We probably need to swicth even if orbit is not enabled
+            // this functionality is not really related to the orbit controller
+            // appart from the point in the previous commentary
+            if orbit_controller.is_enabled {
+                switch_camera_projection(
+                    orbit_controller,
+                    &mut transform,
+                    &mut next_projection.0,
+                    &mut projection,
+                );
+            }
+        } else {
+            warn!("Camera not found while trying to swith to Projection");
         }
     }
 }

@@ -7,7 +7,6 @@ use bevy::{
         ButtonState,
     },
     prelude::*,
-    //render::camera::ScalingMode,
 };
 
 use bevy_blendy_cameras::{
@@ -50,15 +49,16 @@ const FLY_HELP_TEXT: &str = "\
     Press F to pan right\n\
     ";
 
-#[derive(Default, Resource)]
+#[derive(Resource)]
 struct Scene {
-    pub scene_entity: Option<Entity>,
-    pub cube_entity: Option<Entity>,
+    pub camera_entity: Entity,
+    pub scene_entity: Entity,
+    pub cube_entity: Entity,
 }
 
-#[derive(Default, Resource)]
+#[derive(Resource)]
 struct HelpText {
-    pub help_text_entity: Option<Entity>,
+    pub help_text_entity: Entity,
 }
 
 fn main() {
@@ -79,8 +79,6 @@ fn main() {
                 frame_camera_system,
             ),
         )
-        .insert_resource(Scene::default())
-        .insert_resource(HelpText::default())
         .run();
 }
 
@@ -88,10 +86,9 @@ fn setup_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut scene: ResMut<Scene>,
-    mut help_text: ResMut<HelpText>,
 ) {
     // Scene
+    let mut cube_entity = Entity::PLACEHOLDER;
     let scene_entity = commands
         .spawn(SpatialBundle::default())
         .with_children(|parent| {
@@ -102,7 +99,7 @@ fn setup_system(
                 ..default()
             });
             // Cube
-            let cube_entity = parent
+            cube_entity = parent
                 .spawn(PbrBundle {
                     mesh: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
                     material: materials.add(Color::srgb(0.8, 0.7, 0.6)),
@@ -110,10 +107,8 @@ fn setup_system(
                     ..default()
                 })
                 .id();
-            scene.cube_entity = Some(cube_entity);
         })
         .id();
-    scene.scene_entity = Some(scene_entity);
     // Light
     commands.spawn(PointLightBundle {
         point_light: PointLight {
@@ -124,29 +119,38 @@ fn setup_system(
         ..default()
     });
     // Camera
-    commands.spawn((
-        Camera3dBundle {
-            //projection: Projection::Orthographic(OrthographicProjection {
-            //    scaling_mode: ScalingMode::FixedVertical(1.0),
-            //    ..default()
-            //}),
-            transform: Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
-            ..default()
-        },
-        OrbitCameraController::default(),
-        FlyCameraController {
-            is_enabled: false,
-            ..default()
-        },
-    ));
+    let camera_entity = commands
+        .spawn((
+            Camera3dBundle {
+                transform: Transform::from_translation(Vec3::new(
+                    0.0, 1.5, 5.0,
+                )),
+                ..default()
+            },
+            OrbitCameraController::default(),
+            FlyCameraController {
+                is_enabled: false,
+                ..default()
+            },
+        ))
+        .id();
     // Help text
     let help_text_entity = commands
         .spawn(TextBundle::from_section(
             format!("{GENERAL_HELP_TEXT}\n{ORBIT_HELP_TEXT}"),
-            TextStyle::default(),
+            TextStyle {
+                font_size: 14.0,
+                ..default()
+            },
         ))
         .id();
-    help_text.help_text_entity = Some(help_text_entity);
+    // Resources
+    commands.insert_resource(Scene {
+        camera_entity,
+        scene_entity,
+        cube_entity,
+    });
+    commands.insert_resource(HelpText { help_text_entity });
 }
 
 // FIXME: Use the same event with parameter to switch
@@ -156,9 +160,12 @@ fn switch_camera_controler_system(
     mut orbit_ev_writer: EventWriter<SwitchToOrbitController>,
     mut fly_ev_writer: EventWriter<SwitchToFlyController>,
     mut help_text: ResMut<HelpText>,
+    scene: Res<Scene>,
 ) {
     if key_input.just_pressed(KeyCode::KeyF) {
-        fly_ev_writer.send_default();
+        fly_ev_writer.send(SwitchToFlyController {
+            camera_entity: scene.camera_entity,
+        });
         change_help_text(
             format!("{GENERAL_HELP_TEXT}\n{FLY_HELP_TEXT}"),
             &mut commands,
@@ -166,7 +173,9 @@ fn switch_camera_controler_system(
         );
     }
     if key_input.just_pressed(KeyCode::KeyO) {
-        orbit_ev_writer.send_default();
+        orbit_ev_writer.send(SwitchToOrbitController {
+            camera_entity: scene.camera_entity,
+        });
         change_help_text(
             format!("{GENERAL_HELP_TEXT}\n{ORBIT_HELP_TEXT}"),
             &mut commands,
@@ -178,51 +187,73 @@ fn switch_camera_controler_system(
 fn switch_camera_projection_system(
     key_input: Res<ButtonInput<KeyCode>>,
     mut ev_writer: EventWriter<SwitchProjection>,
+    scene: Res<Scene>,
 ) {
     if key_input.just_pressed(KeyCode::Numpad5) {
-        ev_writer.send_default();
+        ev_writer.send(SwitchProjection {
+            camera_entity: scene.camera_entity,
+        });
     }
 }
 
 fn switch_camera_viewpoint_system(
     key_input: Res<ButtonInput<KeyCode>>,
     mut ev_writer: EventWriter<ViewpointEvent>,
+    scene: Res<Scene>,
 ) {
     if !key_input.pressed(KeyCode::ShiftLeft)
         && !key_input.pressed(KeyCode::ShiftRight)
         && key_input.pressed(KeyCode::Numpad1)
     {
-        ev_writer.send(ViewpointEvent(Viewpoint::Front));
+        ev_writer.send(ViewpointEvent {
+            camera_entity: scene.camera_entity,
+            viewpoint: Viewpoint::Front,
+        });
     }
     if (key_input.pressed(KeyCode::ShiftLeft)
         || key_input.pressed(KeyCode::ShiftRight))
         && key_input.pressed(KeyCode::Numpad1)
     {
-        ev_writer.send(ViewpointEvent(Viewpoint::Back));
+        ev_writer.send(ViewpointEvent {
+            camera_entity: scene.camera_entity,
+            viewpoint: Viewpoint::Back,
+        });
     }
     if !key_input.pressed(KeyCode::ShiftLeft)
         && !key_input.pressed(KeyCode::ShiftRight)
         && key_input.pressed(KeyCode::Numpad3)
     {
-        ev_writer.send(ViewpointEvent(Viewpoint::Right));
+        ev_writer.send(ViewpointEvent {
+            camera_entity: scene.camera_entity,
+            viewpoint: Viewpoint::Right,
+        });
     }
     if (key_input.pressed(KeyCode::ShiftLeft)
         || key_input.pressed(KeyCode::ShiftRight))
         && key_input.pressed(KeyCode::Numpad3)
     {
-        ev_writer.send(ViewpointEvent(Viewpoint::Left));
+        ev_writer.send(ViewpointEvent {
+            camera_entity: scene.camera_entity,
+            viewpoint: Viewpoint::Left,
+        });
     }
     if !key_input.pressed(KeyCode::ShiftLeft)
         && !key_input.pressed(KeyCode::ShiftRight)
         && key_input.pressed(KeyCode::Numpad7)
     {
-        ev_writer.send(ViewpointEvent(Viewpoint::Top));
+        ev_writer.send(ViewpointEvent {
+            camera_entity: scene.camera_entity,
+            viewpoint: Viewpoint::Top,
+        });
     }
     if (key_input.pressed(KeyCode::ShiftLeft)
         || key_input.pressed(KeyCode::ShiftRight))
         && key_input.pressed(KeyCode::Numpad7)
     {
-        ev_writer.send(ViewpointEvent(Viewpoint::Bottom));
+        ev_writer.send(ViewpointEvent {
+            camera_entity: scene.camera_entity,
+            viewpoint: Viewpoint::Bottom,
+        });
     }
 }
 
@@ -236,14 +267,16 @@ fn frame_camera_system(
             match &ev.logical_key {
                 Key::Home => {
                     ev_writer.send(FrameEvent {
-                        entities: vec![scene.scene_entity.unwrap()],
+                        camera_entity: scene.camera_entity,
+                        entities_to_be_framed: vec![scene.scene_entity],
                         include_children: true,
                     });
                 }
                 Key::Character(str) => {
                     if str == "c" {
                         ev_writer.send(FrameEvent {
-                            entities: vec![scene.cube_entity.unwrap()],
+                            camera_entity: scene.camera_entity,
+                            entities_to_be_framed: vec![scene.cube_entity],
                             include_children: false,
                         });
                     }
@@ -260,11 +293,16 @@ fn change_help_text(
     help_text: &mut HelpText,
 ) {
     commands
-        .entity(help_text.help_text_entity.unwrap())
+        .entity(help_text.help_text_entity)
         .despawn_recursive();
-    help_text.help_text_entity = None;
     let help_text_entity = commands
-        .spawn(TextBundle::from_section(text, TextStyle::default()))
+        .spawn(TextBundle::from_section(
+            text,
+            TextStyle {
+                font_size: 14.0,
+                ..default()
+            },
+        ))
         .id();
-    help_text.help_text_entity = Some(help_text_entity);
+    help_text.help_text_entity = help_text_entity;
 }

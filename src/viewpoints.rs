@@ -91,7 +91,12 @@ impl Viewpoint {
 
 /// Event used to set the camera point of view
 #[derive(Event)]
-pub struct ViewpointEvent(pub Viewpoint);
+pub struct ViewpointEvent {
+    /// The camera for wich to change viewpoint
+    pub camera_entity: Entity,
+    /// The viewpoint to apply to the camera
+    pub viewpoint: Viewpoint,
+}
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn viewpoint_system(
@@ -108,16 +113,20 @@ pub(crate) fn viewpoint_system(
         Or<(With<OrbitCameraController>, With<FlyCameraController>)>,
     >,
 ) {
-    for ev in ev_read.read() {
-        let (yaw, pitch) = ev.0.to_yaw_pitch();
-        for (
+    for ViewpointEvent {
+        camera_entity,
+        viewpoint,
+    } in ev_read.read()
+    {
+        if let Ok((
             // entity,
             mut transform,
             orbit_controller_opt,
             fly_controller_opt,
             mut projection,
-        ) in cameras_query.iter_mut()
+        )) = cameras_query.get_mut(*camera_entity)
         {
+            let (yaw, pitch) = viewpoint.to_yaw_pitch();
             if let Some(mut controller) = orbit_controller_opt {
                 // NOTE: Checking if viewport is active does not work if
                 // no manual manipulation of the camera is done a priory.
@@ -148,6 +157,8 @@ pub(crate) fn viewpoint_system(
                     transform.rotation = rotation;
                 }
             }
+        } else {
+            warn!("Camera not found while trying to set viewpoint");
         }
     }
 }
