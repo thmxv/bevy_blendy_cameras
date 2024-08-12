@@ -81,11 +81,20 @@ pub(crate) struct OtherProjection(Projection);
 
 /// System set to allow ordering
 #[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
-pub struct BlendyCamerasSystemSet;
-
-/// System set to only run when GUI has NOT the focus
-#[derive(Debug, Clone, Copy, SystemSet, PartialEq, Eq, Hash)]
-pub struct GuiFocusSystemSet;
+pub enum BlendyCamerasSystemSet {
+    /// Check if egui has the focus
+    #[cfg(feature = "bevy_egui")]
+    CheckEguiWantsFocus,
+    /// Process the input and check which camera is active
+    ProcessInput,
+    /// Handle the [`SwitchProjection`], [`SwitchToOrbitController`],
+    /// [`SwitchToFlyController`], [`ViewpointEvent`] and [`FrameEvent`]
+    /// events
+    HandleEvents,
+    /// Handle the [`OrbitCameraController`] and [`FlyCameraController`] only
+    /// if egui has not the focus
+    Controllers,
+}
 
 /// Bevy pluging that contains all the systems necessarty to this crate
 pub struct BlendyCamerasPlugin;
@@ -106,50 +115,45 @@ impl Plugin for BlendyCamerasPlugin {
         .add_systems(
             PostUpdate,
             (
-                mouse_key_tracker_system,
-                orbit_camera_controller_system,
-                fly_camera_controller_system,
+                active_viewport_data_system.run_if(
+                    |active_cam: Res<ActiveCameraData>| !active_cam.manual,
+                ),
+                (mouse_key_tracker_system, wrap_grab_center_cursor_system),
             )
                 .chain()
-                .in_set(GuiFocusSystemSet)
-                .in_set(BlendyCamerasSystemSet)
-                .before(CameraUpdateSystem)
-                .before(TransformSystem::TransformPropagate),
+                .in_set(BlendyCamerasSystemSet::ProcessInput),
         )
         .add_systems(
             PostUpdate,
             (
-                active_viewport_data_system.run_if(
-                    |active_cam: Res<ActiveCameraData>| !active_cam.manual,
-                ),
-                wrap_grab_center_cursor_system
-                    .after(active_viewport_data_system),
-                switch_to_fly_camera_controller_system,
-                switch_to_orbit_camera_controller_system,
                 switch_camera_projection_system,
+                (
+                    switch_to_fly_camera_controller_system,
+                    switch_to_orbit_camera_controller_system,
+                )
+                    .after(switch_camera_projection_system),
                 viewpoint_system,
                 frame_system,
             )
-                .in_set(BlendyCamerasSystemSet)
-                .before(GuiFocusSystemSet),
+                .in_set(BlendyCamerasSystemSet::HandleEvents)
+                .after(BlendyCamerasSystemSet::ProcessInput),
+        )
+        .add_systems(
+            PostUpdate,
+            (orbit_camera_controller_system, fly_camera_controller_system)
+                .in_set(BlendyCamerasSystemSet::Controllers)
+                .after(BlendyCamerasSystemSet::HandleEvents)
+                .before(CameraUpdateSystem)
+                .before(TransformSystem::TransformPropagate),
         );
         #[cfg(feature = "bevy_egui")]
         {
-            app.init_resource::<EguiWantsFocus>()
-                .add_systems(
-                    PostUpdate,
-                    egui::check_egui_wants_focus
-                        .after(EguiSet::InitContexts)
-                        //.before(EditorCamSystemSet)
-                        .before(GuiFocusSystemSet),
-                )
-                .configure_sets(
-                    PostUpdate,
-                    GuiFocusSystemSet.run_if(resource_equals(EguiWantsFocus {
-                        prev: false,
-                        curr: false,
-                    })),
-                );
+            app.init_resource::<EguiWantsFocus>().add_systems(
+                PreUpdate,
+                egui::check_egui_wants_focus
+                    .in_set(BlendyCamerasSystemSet::CheckEguiWantsFocus)
+                    .after(EguiSet::BeginFrame),
+            );
         }
     }
 }
@@ -293,10 +297,10 @@ fn active_viewport_data_system(
         Option<&OrbitCameraController>,
         Option<&FlyCameraController>,
     )>,
+    #[cfg(feature = "bevy_egui")] egui_wants_focus: Res<EguiWantsFocus>,
 ) {
     let mut new_resource = ActiveCameraData::default();
     let mut max_cam_order = 0;
-
     let mut has_input = false;
     for (entity, camera, orbit_controller_opt, fly_controller_opt) in
         orbit_fly_cameras.iter()
@@ -338,29 +342,39 @@ fn active_viewport_data_system(
                     == touches.iter().count());
         if input_just_activated {
             has_input = true;
-            if let Some((window_entity, window)) =
-                get_window_if_cursor_in_camera_viewport(
-                    camera,
-                    Some(&touches),
-                    &primary_window,
-                    &other_windows,
-                )
+
+            #[allow(unused_mut, unused_assignments)]
+            let mut should_get_input = true;
+            #[cfg(feature = "bevy_egui")]
             {
-                // Only set if camera order is higher. This may
-                // overwrite a previous value in the case the viewport
-                // is overlapping another viewport.
-                if camera.order >= max_cam_order {
-                    new_resource = ActiveCameraData {
-                        entity: Some(entity),
-                        viewport_size: camera.logical_viewport_size(),
-                        window_size: Some(Vec2::new(
-                            window.width(),
-                            window.height(),
-                        )),
-                        manual: false,
-                        window_entity: Some(window_entity),
-                    };
-                    max_cam_order = camera.order;
+                should_get_input =
+                    !egui_wants_focus.prev && !egui_wants_focus.curr;
+            }
+            if should_get_input {
+                if let Some((window_entity, window)) =
+                    get_window_if_cursor_in_camera_viewport(
+                        camera,
+                        Some(&touches),
+                        &primary_window,
+                        &other_windows,
+                    )
+                {
+                    // Only set if camera order is higher. This may
+                    // overwrite a previous value in the case the viewport
+                    // is overlapping another viewport.
+                    if camera.order >= max_cam_order {
+                        new_resource = ActiveCameraData {
+                            entity: Some(entity),
+                            viewport_size: camera.logical_viewport_size(),
+                            window_size: Some(Vec2::new(
+                                window.width(),
+                                window.height(),
+                            )),
+                            manual: false,
+                            window_entity: Some(window_entity),
+                        };
+                        max_cam_order = camera.order;
+                    }
                 }
             }
         }
