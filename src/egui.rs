@@ -31,13 +31,10 @@ pub(crate) fn check_egui_wants_focus(
     // contexts want focus, then it must be the one that the user is
     // interacting with.
     let new_wants_focus = windows.iter().any(|window| {
-        if let Some(ctx) = contexts.try_ctx_for_window_mut(window) {
-            ctx.wants_pointer_input()
-                || ctx.wants_keyboard_input()
-                || ctx.is_pointer_over_area()
-        } else {
-            false
-        }
+        let ctx = contexts.ctx_for_entity_mut(window);
+        ctx.wants_pointer_input()
+            || ctx.wants_keyboard_input()
+            || ctx.is_pointer_over_area()
     });
     let new_res = EguiWantsFocus {
         prev: wants_focus.curr,
