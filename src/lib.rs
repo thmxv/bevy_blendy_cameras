@@ -22,7 +22,6 @@ use bevy::{
 #[cfg(feature = "bevy_egui")]
 use bevy_egui::EguiSet;
 use bevy_mod_raycast::prelude::*;
-use raycast::BlendyCamerasRaycastSet;
 
 #[cfg(feature = "bevy_egui")]
 pub use crate::egui::EguiWantsFocus;
@@ -31,7 +30,10 @@ use crate::{
     frame::frame_system,
     input::{mouse_key_tracker_system, MouseKeyTracker},
     orbit::orbit_camera_controller_system,
-    raycast::add_raycast_hooks,
+    raycast::{
+        add_to_raycast_system, remove_from_raycast_system,
+        BlendyCamerasRaycastSet,
+    },
     viewpoints::viewpoint_system,
 };
 pub use crate::{
@@ -111,7 +113,10 @@ impl Plugin for BlendyCamerasPlugin {
         .add_event::<SwitchToFlyController>()
         .add_event::<ViewpointEvent>()
         .add_event::<FrameEvent>()
-        .add_systems(Startup, startup_system)
+        .add_systems(
+            Update,
+            (add_to_raycast_system, remove_from_raycast_system),
+        )
         .add_systems(
             PostUpdate,
             (
@@ -192,10 +197,6 @@ pub struct ActiveCameraData {
     /// or wrap around the cursor while controlling the camera with mouse
     /// movements.
     pub window_entity: Option<Entity>,
-}
-
-fn startup_system(world: &mut World) {
-    add_raycast_hooks(world);
 }
 
 // TODO: Rename
