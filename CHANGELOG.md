@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.4.1] 
+
+### Changed
+
+- Switch to bevy_egui 0.29
+- Use system monitoring changes instead of hooks on Handle<Mesh>
+
 ## [0.4.0] 
 
 ### Added
