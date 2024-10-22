@@ -155,14 +155,10 @@ pub(crate) fn orbit_just_pressed(
         .modifier_orbit
         .map_or(true, |modifier| key_input.pressed(modifier))
         && (mouse_input.just_pressed(pan_orbit.button_orbit));
-    let just_pressed = just_pressed
+    just_pressed
         && pan_orbit
             .modifier_pan
-            .map_or(true, |modifier| !key_input.pressed(modifier));
-    //if just_pressed {
-    //    trace!("Orbit just pressed");
-    //}
-    just_pressed
+            .map_or(true, |modifier| !key_input.pressed(modifier))
 }
 
 pub(crate) fn orbit_just_released(
