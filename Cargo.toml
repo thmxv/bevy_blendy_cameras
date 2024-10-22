@@ -1,6 +1,6 @@
 [package]
 name = "bevy_blendy_cameras"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Xavier Thomas"]
 description = "Bevy editor like cameras controls for Pan/Orbit/Zoom and Fly mode. Switch mode, set camera viewpoint and frame view around entities"
