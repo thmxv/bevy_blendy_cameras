@@ -306,8 +306,8 @@ impl TabViewer<'_> {
         let camera_query = system_state.get(self.world);
         let (transform, projection) = camera_query.get(camera_entity).unwrap();
         let viewpoint_text = match Viewpoint::from_transform(transform) {
-            Some(vp) => format!("{vp:?}"),
-            None => "User".to_string(),
+            Viewpoint::User { yaw: _, pitch: _ } => "User".to_string(),
+            vp => format!("{vp:?}"),
         };
         let projection_text = match *projection {
             Projection::Orthographic(_) => "Orthographic",

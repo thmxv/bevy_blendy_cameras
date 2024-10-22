@@ -12,6 +12,13 @@ use crate::{
 /// Point of view of a camera, looking in the oposite direction
 #[derive(Debug, Copy, Clone)]
 pub enum Viewpoint {
+    /// Custom user viewpoint
+    User {
+        /// Rotation around the local vertical axis
+        yaw: f32,
+        /// Rotation around the local horizontal transverse axis
+        pitch: f32,
+    },
     /// View from top
     Top,
     /// View from bottom
@@ -41,6 +48,7 @@ impl Viewpoint {
 
     pub(crate) fn to_yaw_pitch(self) -> (f32, f32) {
         match self {
+            Self::User { yaw, pitch } => (yaw, pitch),
             Self::Top => (0.0, FRAC_PI_2),
             Self::Bottom => (0.0, -FRAC_PI_2),
             Self::Front => (0.0, 0.0),
@@ -50,40 +58,40 @@ impl Viewpoint {
         }
     }
 
-    fn from_yaw_pitch(yaw: f32, pitch: f32) -> Option<Self> {
+    fn from_yaw_pitch(yaw: f32, pitch: f32) -> Self {
         // println!("{yaw} {pitch}");
         if utils::approx_equal(yaw, 0.0)
             && utils::approx_equal(pitch, FRAC_PI_2)
         {
-            Some(Self::Top)
+            Self::Top
         } else if utils::approx_equal(yaw, 0.0)
             && utils::approx_equal(pitch, -FRAC_PI_2)
         {
-            Some(Self::Bottom)
+            Self::Bottom
         } else if utils::approx_equal(yaw, 0.0)
             && utils::approx_equal(pitch, 0.0)
         {
-            Some(Self::Front)
+            Self::Front
         } else if (utils::approx_equal(yaw, PI)
             || utils::approx_equal(yaw, -PI))
             && utils::approx_equal(pitch, 0.0)
         {
-            Some(Self::Back)
+            Self::Back
         } else if utils::approx_equal(yaw, -FRAC_PI_2)
             && utils::approx_equal(pitch, 0.0)
         {
-            Some(Self::Left)
+            Self::Left
         } else if utils::approx_equal(yaw, FRAC_PI_2)
             && utils::approx_equal(pitch, 0.0)
         {
-            Some(Self::Right)
+            Self::Right
         } else {
-            None
+            Self::User { yaw, pitch }
         }
     }
 
     /// Calculate [`Viewpoint`] from camera [`Transform`]
-    pub fn from_transform(transform: &Transform) -> Option<Self> {
+    pub fn from_transform(transform: &Transform) -> Self {
         let (yaw, pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
         Self::from_yaw_pitch(yaw, -pitch)
     }
