@@ -19,9 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.5.1]
+
+### Changed
+
+- Update `bevy_egui` to `0.30` and `egui` to `0.29`
+
+### Fixed
+
+- Fix a panic when `egui` fails to return a context
+
 ## [0.5.0]
 
 ### Changed
+
 - Add "User" to viewpoint enum
 
 ## [0.4.1] 
