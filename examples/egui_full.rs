@@ -538,14 +538,17 @@ fn gui_system_exclusive(world: &mut World) {
 
 fn set_cameras_viewports_system(
     ui_state: Res<UiState>,
-    primary_window: Query<&mut Window, With<PrimaryWindow>>,
-    egui_settings: Res<bevy_egui::EguiSettings>,
+    primary_window: Query<
+        (&mut Window, &bevy_egui::EguiSettings),
+        With<PrimaryWindow>,
+    >,
     mut cameras: Query<(Entity, &mut Camera)>,
 ) {
-    let Ok(window) = primary_window.get_single() else {
+    let Ok((window, window_egui_settings)) = primary_window.get_single() else {
         return;
     };
-    let scale_factor = window.scale_factor() * egui_settings.scale_factor;
+    let scale_factor =
+        window.scale_factor() * window_egui_settings.scale_factor;
 
     for (entity, mut cam) in &mut cameras {
         let viewport_rect =

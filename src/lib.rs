@@ -157,7 +157,7 @@ impl Plugin for BlendyCamerasPlugin {
                 PreUpdate,
                 egui::check_egui_wants_focus
                     .in_set(BlendyCamerasSystemSet::CheckEguiWantsFocus)
-                    .after(EguiSet::BeginFrame),
+                    .after(EguiSet::BeginPass),
             );
         }
     }
