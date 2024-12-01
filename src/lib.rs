@@ -320,7 +320,8 @@ fn active_viewport_data_system(
                         fly_controller,
                         &mouse_input,
                         &key_input,
-                    );
+                    )
+                    || input::move_just_pressed(fly_controller, &key_input);
             }
         }
 

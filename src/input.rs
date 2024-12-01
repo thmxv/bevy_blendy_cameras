@@ -248,12 +248,24 @@ pub(crate) fn rotate_just_pressed(
 }
 
 pub(crate) fn rotate_just_released(
-    fly_orbit: &FlyCameraController,
+    fly_controller: &FlyCameraController,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     key_input: &Res<ButtonInput<KeyCode>>,
 ) -> bool {
-    fly_orbit
+    fly_controller
         .modifier_rotate
         .map_or(true, |modifier| key_input.pressed(modifier))
-        && (mouse_input.just_released(fly_orbit.button_rotate))
+        && (mouse_input.just_released(fly_controller.button_rotate))
+}
+
+pub(crate) fn move_just_pressed(
+    fly_controller: &FlyCameraController,
+    key_input: &Res<ButtonInput<KeyCode>>,
+) -> bool {
+    key_input.just_pressed(fly_controller.key_move_up)
+        || key_input.just_pressed(fly_controller.key_move_down)
+        || key_input.just_pressed(fly_controller.key_move_left)
+        || key_input.just_pressed(fly_controller.key_move_right)
+        || key_input.just_pressed(fly_controller.key_move_forward)
+        || key_input.just_pressed(fly_controller.key_move_backward)
 }
