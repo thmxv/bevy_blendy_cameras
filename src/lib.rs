@@ -21,7 +21,6 @@ use bevy::{
 };
 #[cfg(feature = "bevy_egui")]
 use bevy_egui::EguiSet;
-use bevy_mod_raycast::prelude::*;
 
 #[cfg(feature = "bevy_egui")]
 pub use crate::egui::EguiWantsFocus;
@@ -30,10 +29,6 @@ use crate::{
     frame::frame_system,
     input::{mouse_key_tracker_system, MouseKeyTracker},
     orbit::orbit_camera_controller_system,
-    raycast::{
-        add_to_raycast_system, remove_from_raycast_system,
-        BlendyCamerasRaycastSet,
-    },
     viewpoints::viewpoint_system,
 };
 pub use crate::{
@@ -103,54 +98,47 @@ pub struct BlendyCamerasPlugin;
 
 impl Plugin for BlendyCamerasPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(
-            DeferredRaycastingPlugin::<BlendyCamerasRaycastSet>::default(),
-        )
-        .init_resource::<ActiveCameraData>()
-        .init_resource::<MouseKeyTracker>()
-        .add_event::<SwitchProjection>()
-        .add_event::<SwitchToOrbitController>()
-        .add_event::<SwitchToFlyController>()
-        .add_event::<ViewpointEvent>()
-        .add_event::<FrameEvent>()
-        .add_systems(
-            Update,
-            (add_to_raycast_system, remove_from_raycast_system),
-        )
-        .add_systems(
-            PostUpdate,
-            (
-                active_viewport_data_system.run_if(
-                    |active_cam: Res<ActiveCameraData>| !active_cam.manual,
-                ),
-                (mouse_key_tracker_system, wrap_grab_center_cursor_system),
-            )
-                .chain()
-                .in_set(BlendyCamerasSystemSet::ProcessInput),
-        )
-        .add_systems(
-            PostUpdate,
-            (
-                switch_camera_projection_system,
+        app.init_resource::<ActiveCameraData>()
+            .init_resource::<MouseKeyTracker>()
+            .add_event::<SwitchProjection>()
+            .add_event::<SwitchToOrbitController>()
+            .add_event::<SwitchToFlyController>()
+            .add_event::<ViewpointEvent>()
+            .add_event::<FrameEvent>()
+            .add_systems(
+                PostUpdate,
                 (
-                    switch_to_fly_camera_controller_system,
-                    switch_to_orbit_camera_controller_system,
+                    active_viewport_data_system.run_if(
+                        |active_cam: Res<ActiveCameraData>| !active_cam.manual,
+                    ),
+                    (mouse_key_tracker_system, wrap_grab_center_cursor_system),
                 )
-                    .after(switch_camera_projection_system),
-                viewpoint_system,
-                frame_system,
+                    .chain()
+                    .in_set(BlendyCamerasSystemSet::ProcessInput),
             )
-                .in_set(BlendyCamerasSystemSet::HandleEvents)
-                .after(BlendyCamerasSystemSet::ProcessInput),
-        )
-        .add_systems(
-            PostUpdate,
-            (orbit_camera_controller_system, fly_camera_controller_system)
-                .in_set(BlendyCamerasSystemSet::Controllers)
-                .after(BlendyCamerasSystemSet::HandleEvents)
-                .before(CameraUpdateSystem)
-                .before(TransformSystem::TransformPropagate),
-        );
+            .add_systems(
+                PostUpdate,
+                (
+                    switch_camera_projection_system,
+                    (
+                        switch_to_fly_camera_controller_system,
+                        switch_to_orbit_camera_controller_system,
+                    )
+                        .after(switch_camera_projection_system),
+                    viewpoint_system,
+                    frame_system,
+                )
+                    .in_set(BlendyCamerasSystemSet::HandleEvents)
+                    .after(BlendyCamerasSystemSet::ProcessInput),
+            )
+            .add_systems(
+                PostUpdate,
+                (orbit_camera_controller_system, fly_camera_controller_system)
+                    .in_set(BlendyCamerasSystemSet::Controllers)
+                    .after(BlendyCamerasSystemSet::HandleEvents)
+                    .before(CameraUpdateSystem)
+                    .before(TransformSystem::TransformPropagate),
+            );
         #[cfg(feature = "bevy_egui")]
         {
             app.init_resource::<EguiWantsFocus>().add_systems(
@@ -495,8 +483,8 @@ fn wrap_grab_center_cursor_system(
             // - On Wayland only `Locked` works and cannot set cursor position
             //   unless it is locked according to message but can never be
             //   set according to tests.
-            window.cursor.grab_mode = CursorGrabMode::Locked;
-            // window.cursor.grab_mode = CursorGrabMode::Confined;
+            window.cursor_options.grab_mode = CursorGrabMode::Locked;
+            // window.cursor_options.grab_mode = CursorGrabMode::Confined;
         }
         if center_cursor {
             let center = viewport_rect.center();
@@ -504,15 +492,15 @@ fn wrap_grab_center_cursor_system(
             let _ = winit_window
                 .set_cursor_grab(winit::window::CursorGrabMode::Locked);
             // End of hack
-            window.cursor.grab_mode = CursorGrabMode::Locked;
-            // window.cursor.visible = false;
+            window.cursor_options.grab_mode = CursorGrabMode::Locked;
+            // window.cursor_options.visible = false;
             // FIXME: Does not work in Wayland
             window.set_cursor_position(Some(center));
         }
     } else if drag_just_released {
         *cursor_start_pos = None;
-        window.cursor.grab_mode = CursorGrabMode::None;
-        // window.cursor.visible = true;
+        window.cursor_options.grab_mode = CursorGrabMode::None;
+        // window.cursor_options.visible = true;
     }
     // Only wrap/center/grab if dragging started in the viewport.
     if cursor_start_pos.is_some()

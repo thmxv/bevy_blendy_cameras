@@ -3,18 +3,17 @@ use std::f32::consts::PI;
 use bevy::{
     ecs::component::StorageType, prelude::*, render::camera::ScalingMode,
 };
-use bevy_mod_raycast::prelude::*;
 
 use crate::{
     input::{self, MouseKeyTracker},
-    raycast::BlendyCamerasRaycastSet,
+    raycast::{get_cursor_ray, get_nearest_intersection},
     utils, ActiveCameraData, OtherProjection,
 };
 
 /// Component to tag an entiy as able to be controlled by orbiting, panning
 /// and zooming.
 /// The entity must have `Transform` and `Projection` components. Typically
-/// you would add `Camera3dBundle` to this entity.
+/// you would add `Camera3d` to this entity.
 pub struct OrbitCameraController {
     /// The point the camera looks at. The camera also orbit around and zoom
     /// to that point if `auto_depth` and `zoom_to_mouse_position` are not set.
@@ -86,11 +85,13 @@ impl Component for OrbitCameraController {
         hooks
             .on_add(|mut world, entity, _component_id| {
                 let projection = world.get::<Projection>(entity).unwrap();
-                let projection = match projection {
+                let other_projection = match projection {
                     Projection::Perspective(_) => {
                         Projection::Orthographic(OrthographicProjection {
-                            scaling_mode: ScalingMode::FixedVertical(1.0),
-                            ..default()
+                            scaling_mode: ScalingMode::FixedVertical {
+                                viewport_height: 1.0,
+                            },
+                            ..OrthographicProjection::default_3d()
                         })
                     }
                     Projection::Orthographic(_) => {
@@ -102,18 +103,10 @@ impl Component for OrbitCameraController {
                 world
                     .commands()
                     .entity(entity)
-                    .insert(OtherProjection(projection))
-                    // TODO: Only insert if camera is active
-                    .insert(
-                        RaycastSource::<BlendyCamerasRaycastSet>::new_cursor(),
-                    );
+                    .insert(OtherProjection(other_projection));
             })
             .on_remove(|mut world, entity, _component_id| {
-                world
-                    .commands()
-                    .entity(entity)
-                    .remove::<RaycastSource<BlendyCamerasRaycastSet>>()
-                    .remove::<OtherProjection>();
+                world.commands().entity(entity).remove::<OtherProjection>();
             });
     }
 }
@@ -169,14 +162,17 @@ impl OrbitCameraController {
 #[allow(clippy::too_many_arguments)]
 fn orbit_camera(
     controller: &mut Mut<OrbitCameraController>,
-    raycast_source: &RaycastSource<BlendyCamerasRaycastSet>,
+    camera: &Camera,
+    windows: &Query<&Window>,
     transform: &Mut<Transform>,
+    global_transform: &GlobalTransform,
     projection: &Mut<Projection>,
     active_cam: &Res<ActiveCameraData>,
     key_input: &Res<ButtonInput<KeyCode>>,
     mouse_input: &Res<ButtonInput<MouseButton>>,
     mouse_key_tracker: &Res<MouseKeyTracker>,
     pivot_point: &mut Local<Vec3>,
+    ray_cast: &mut MeshRayCast,
 ) -> bool {
     // Update pivot point when needed
     if (controller.auto_depth || controller.zoom_to_mouse_position)
@@ -185,11 +181,17 @@ fn orbit_camera(
             || mouse_key_tracker.scroll_line != 0.0
             || mouse_key_tracker.scroll_pixel != 0.0)
     {
-        if let Some(cursor_ray) = raycast_source.get_ray() {
+        let cursor_ray = active_cam
+            .window_entity
+            .and_then(|window_entity| windows.get(window_entity).ok())
+            .and_then(|window| {
+                get_cursor_ray(camera, global_transform, window)
+            });
+        if let Some(cursor_ray) = cursor_ray {
             if let Some((_entity, hit)) =
-                raycast_source.get_nearest_intersection()
+                get_nearest_intersection(ray_cast, cursor_ray)
             {
-                **pivot_point = hit.position();
+                **pivot_point = hit.point;
                 if controller.auto_depth {
                     let camera_transform = match **projection {
                         Projection::Perspective(_) => **transform,
@@ -321,6 +323,7 @@ fn orbit_camera(
         let pixel_delta = -scroll_pixel * old_radius * 0.2;
         let radius_delta = line_delta + pixel_delta;
         // Update the target value
+        // FIXME: apply a lower limit
         controller.radius = controller.radius.map(|value| value + radius_delta);
         // If it is pixel-based scrolling, add it directly to the
         // current value
@@ -367,18 +370,22 @@ pub(crate) fn orbit_camera_controller_system(
     mut orbit_cameras: Query<(
         Entity,
         &mut OrbitCameraController,
-        &RaycastSource<BlendyCamerasRaycastSet>,
+        &Camera,
         &mut Transform,
+        &GlobalTransform,
         &mut Projection,
     )>,
+    windows: Query<&Window>,
     mut pivot_point: Local<Vec3>,
+    mut ray_cast: MeshRayCast,
     //mut gizmos: Gizmos,
 ) {
     for (
         entity,
         mut controller,
-        raycast_source,
+        camera,
         mut transform,
+        global_transform,
         mut projection,
     ) in orbit_cameras.iter_mut()
     {
@@ -387,14 +394,17 @@ pub(crate) fn orbit_camera_controller_system(
         if controller.is_enabled && active_cam.entity == Some(entity) {
             has_moved = orbit_camera(
                 &mut controller,
-                raycast_source,
+                camera,
+                &windows,
                 &transform,
+                global_transform,
                 &projection,
                 &active_cam,
                 &key_input,
                 &mouse_input,
                 &mouse_key_tracker,
                 &mut pivot_point,
+                &mut ray_cast,
             );
             //gizmos.sphere(
             //    controller.focus,

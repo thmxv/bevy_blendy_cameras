@@ -90,43 +90,36 @@ fn setup_system(
     // Scene
     let mut cube_entity = Entity::PLACEHOLDER;
     let scene_entity = commands
-        .spawn(SpatialBundle::default())
+        .spawn((Transform::default(), Visibility::default()))
         .with_children(|parent| {
             // Ground
-            parent.spawn(PbrBundle {
-                mesh: meshes.add(Plane3d::default().mesh().size(5.0, 5.0)),
-                material: materials.add(Color::srgb(0.3, 0.5, 0.3)),
-                ..default()
-            });
+            parent.spawn((
+                Mesh3d(meshes.add(Plane3d::default().mesh().size(5.0, 5.0))),
+                MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+            ));
             // Cube
             cube_entity = parent
-                .spawn(PbrBundle {
-                    mesh: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
-                    material: materials.add(Color::srgb(0.8, 0.7, 0.6)),
-                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
-                    ..default()
-                })
+                .spawn((
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                    MeshMaterial3d(materials.add(Color::srgb(0.8, 0.7, 0.6))),
+                    Transform::from_xyz(0.0, 0.5, 0.0),
+                ))
                 .id();
         })
         .id();
     // Light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
+    commands.spawn((
+        PointLight {
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
     // Camera
     let camera_entity = commands
         .spawn((
-            Camera3dBundle {
-                transform: Transform::from_translation(Vec3::new(
-                    0.0, 1.5, 5.0,
-                )),
-                ..default()
-            },
+            Camera3d::default(),
+            Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
             OrbitCameraController::default(),
             FlyCameraController {
                 is_enabled: false,
@@ -136,9 +129,9 @@ fn setup_system(
         .id();
     // Help text
     let help_text_entity = commands
-        .spawn(TextBundle::from_section(
-            format!("{GENERAL_HELP_TEXT}\n{ORBIT_HELP_TEXT}"),
-            TextStyle {
+        .spawn((
+            Text::new(format!("{GENERAL_HELP_TEXT}\n{ORBIT_HELP_TEXT}")),
+            TextFont {
                 font_size: 14.0,
                 ..default()
             },
@@ -296,9 +289,9 @@ fn change_help_text(
         .entity(help_text.help_text_entity)
         .despawn_recursive();
     let help_text_entity = commands
-        .spawn(TextBundle::from_section(
-            text,
-            TextStyle {
+        .spawn((
+            Text::new(text),
+            TextFont {
                 font_size: 14.0,
                 ..default()
             },

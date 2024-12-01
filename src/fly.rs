@@ -6,7 +6,7 @@ use crate::{input::MouseKeyTracker, ActiveCameraData};
 
 /// Component to tag an entiy as able to be controlled in "fly mode"
 /// The entity must have `Transform` and `Projection` components. Typically
-/// you would add `Camera3dBundle` to this entity.
+/// you would add `Camera3d` to this entity.
 #[derive(Component)]
 pub struct FlyCameraController {
     /// Speed with wich the entity is moved. Updated when scrolling mouse wheel
@@ -131,7 +131,7 @@ pub(crate) fn fly_camera_controller_system(
             translation = translation.normalize_or_zero();
             translation *= controller.speed
                 * controller.move_sensitivity
-                * time.delta_seconds();
+                * time.delta_secs();
             transform.translation += translation;
         }
     }

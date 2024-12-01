@@ -51,10 +51,8 @@ Add the plugin:
 Add the controllers components to a camera:
 ``` rust ignore
 commands.spawn((
-    Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
-        ..default()
-    },
+    Camera3d::default() ,
+    Transform::from_translation(Vec3::new(0.0, 1.5, 5.0)),
     OrbitCameraController::default(),
     FlyCameraController {
         is_enabled: false,
@@ -62,6 +60,9 @@ commands.spawn((
     },
 ));
 ```
+Adding both controller is not required. If you need just one, only add this one.
+If you want to switch from one to another, adding both before the switch is OK,
+just make sure only one is enabled. Otherwise both will react to inputs.
 
 Check out the [basic example](https://github.com/thmxv/bevy_blendy_cameras/tree/master/examples/basic.rs) 
 to see more functionalities.

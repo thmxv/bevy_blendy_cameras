@@ -34,18 +34,20 @@ unsafe_code = "deny"
 bevy_egui = ["dep:bevy_egui"]
 
 [dependencies]
-bevy = { version = "0.14", default-features = false, features = [
+bevy = { version = "0.15", default-features = false, features = [
     "bevy_asset",
+    "bevy_mesh_picking_backend",
     "bevy_render",
-    "bevy_winit"
+    "bevy_window",
+    "bevy_winit",
 ] }
-bevy_egui = { version = "0.30", optional = true, default-features = false }
-bevy_mod_raycast = { version = "0.18" }
+bevy_egui = { version = "0.31", optional = true, default-features = false }
+# bevy_mod_raycast = { version = "0.18" }
 winit = "0.30"
 
 [dev-dependencies]
-bevy = { version = "0.14" }
-bevy_egui = { version = "0.30", default-features = false, features = [
+bevy = { version = "0.15" }
+bevy_egui = { version = "0.31", default-features = false, features = [
     "render",
     "default_fonts",
 ] }
