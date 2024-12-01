@@ -36,6 +36,12 @@ pub struct OrbitCameraController {
     /// position during intialization.
     /// Automatically updated
     pub pitch: Option<f32>,
+    /// Lower limit on the zoom. This applies to `radius`, in the case of
+    /// using a perspective camera, or the projection's scale in the case of
+    /// using an orthographic camera. Should always be >0 otherwise you'll
+    /// get stuck at 0.
+    /// Defaults to `0.05`.
+    pub zoom_lower_limit: f32,
     /// Sentitivity of the orbiting motion
     pub orbit_sensitivity: f32,
     /// Sentitivity of the panning motion
@@ -118,6 +124,7 @@ impl Default for OrbitCameraController {
             radius: None,
             yaw: None,
             pitch: None,
+            zoom_lower_limit: 0.05,
             orbit_sensitivity: 1.0,
             pan_sensitivity: 1.0,
             zoom_sensitivity: 1.0,
@@ -323,8 +330,9 @@ fn orbit_camera(
         let pixel_delta = -scroll_pixel * old_radius * 0.2;
         let radius_delta = line_delta + pixel_delta;
         // Update the target value
-        // FIXME: apply a lower limit
-        controller.radius = controller.radius.map(|value| value + radius_delta);
+        controller.radius = controller.radius.map(|value| {
+            (value + radius_delta).max(controller.zoom_lower_limit)
+        });
         // If it is pixel-based scrolling, add it directly to the
         // current value
         // controller.radius =
