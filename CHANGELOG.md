@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.6.0]
+
+### Changed
+
+- Update `bevy` to `0.15`
+- Use Bevy internal raycasting facilities and move away from bevy_mod_raycast :/
+- Use a configurable distance of the camera to the focus point, avoiding being 
+  stuck with a distance of 0.0
+
+### Fixed
+
+- Pressing the fly controller keys sets the active camera, avoiding the bug
+  were trying to move a camera (by flying) would move another one.
+
 ## [0.5.1]
 
 ### Changed
