@@ -44,7 +44,8 @@ mod fly;
 mod frame;
 mod input;
 mod orbit;
-mod raycast;
+/// Raycast utilities
+pub mod raycast;
 mod utils;
 mod viewpoints;
 
