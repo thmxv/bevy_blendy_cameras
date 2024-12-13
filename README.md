@@ -81,7 +81,7 @@ to see more functionalities.
 
 ## Credits
 
-- [bevy_panorbit_camera](https://github.com/Plong/bevy_panorbit_camera): The 
+- [bevy_panorbit_camera](https://github.com/Plonq/bevy_panorbit_camera): The 
 code for this plugin is based on this.
 
 ## Disclaimer
