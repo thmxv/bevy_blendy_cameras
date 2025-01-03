@@ -83,8 +83,3 @@ to see more functionalities.
 
 - [bevy_panorbit_camera](https://github.com/Plonq/bevy_panorbit_camera): The 
 code for this plugin is based on this.
-
-## Disclaimer
-
-I am a bit new to both Rust and Bevy and this plugin is in early stages. Help 
-is welcomed.
