@@ -97,7 +97,7 @@ impl UiState {
             added_tabs: &mut added_tabs,
         };
         let mut style = Style::from_egui(ctx.style().as_ref());
-        style.tab.tab_body.inner_margin = egui_dock::egui::Margin::same(0.0);
+        style.tab.tab_body.inner_margin = egui_dock::egui::Margin::same(0);
         DockArea::new(&mut self.dock_state)
             .show_add_buttons(true)
             .show_add_popup(true)
@@ -150,7 +150,7 @@ impl TabViewer<'_> {
     ) {
         egui::Frame::default()
             .fill(ui.visuals().window_fill)
-            .inner_margin(egui::Margin::symmetric(8.0, 2.0))
+            .inner_margin(egui::Margin::symmetric(8, 2))
             .show(ui, |ui| {
                 egui::menu::bar(ui, |ui| {
                     egui::menu::menu_button(ui, "View", |ui| {
@@ -264,7 +264,7 @@ impl TabViewer<'_> {
         .anchor(egui::Align2::LEFT_TOP, offset.to_vec2())
         .show(ui.ctx(), |ui| {
             ui.set_clip_rect(viewport_rect);
-            egui::Frame::none()
+            egui::Frame::NONE
                 .fill(ui.visuals().window_fill)
                 .inner_margin(margin)
                 .show(ui, |ui| {
@@ -530,7 +530,7 @@ fn gui_system_exclusive(world: &mut World) {
 fn set_cameras_viewports_system(
     ui_state: Res<UiState>,
     primary_window: Query<
-        (&mut Window, &bevy_egui::EguiSettings),
+        (&mut Window, &bevy_egui::EguiContextSettings),
         With<PrimaryWindow>,
     >,
     mut cameras: Query<(Entity, &mut Camera)>,

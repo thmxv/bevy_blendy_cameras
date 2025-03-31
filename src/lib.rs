@@ -20,7 +20,7 @@ use bevy::{
     winit::WinitWindows,
 };
 #[cfg(feature = "bevy_egui")]
-use bevy_egui::EguiSet;
+use bevy_egui::EguiPreUpdateSet;
 
 #[cfg(feature = "bevy_egui")]
 pub use crate::egui::EguiWantsFocus;
@@ -146,7 +146,7 @@ impl Plugin for BlendyCamerasPlugin {
                 PreUpdate,
                 egui::check_egui_wants_focus
                     .in_set(BlendyCamerasSystemSet::CheckEguiWantsFocus)
-                    .after(EguiSet::BeginPass),
+                    .after(EguiPreUpdateSet::BeginPass),
             );
         }
     }
