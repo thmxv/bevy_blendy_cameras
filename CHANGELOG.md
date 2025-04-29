@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.7.0]
+
+### Changed
+
+- Update `bevy` to `0.16`
+
 ## [0.6.1]
 
 ### Changed
