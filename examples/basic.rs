@@ -156,7 +156,7 @@ fn switch_camera_controler_system(
     scene: Res<Scene>,
 ) {
     if key_input.just_pressed(KeyCode::KeyF) {
-        fly_ev_writer.send(SwitchToFlyController {
+        fly_ev_writer.write(SwitchToFlyController {
             camera_entity: scene.camera_entity,
         });
         change_help_text(
@@ -166,7 +166,7 @@ fn switch_camera_controler_system(
         );
     }
     if key_input.just_pressed(KeyCode::KeyO) {
-        orbit_ev_writer.send(SwitchToOrbitController {
+        orbit_ev_writer.write(SwitchToOrbitController {
             camera_entity: scene.camera_entity,
         });
         change_help_text(
@@ -183,7 +183,7 @@ fn switch_camera_projection_system(
     scene: Res<Scene>,
 ) {
     if key_input.just_pressed(KeyCode::Numpad5) {
-        ev_writer.send(SwitchProjection {
+        ev_writer.write(SwitchProjection {
             camera_entity: scene.camera_entity,
         });
     }
@@ -198,7 +198,7 @@ fn switch_camera_viewpoint_system(
         && !key_input.pressed(KeyCode::ShiftRight)
         && key_input.pressed(KeyCode::Numpad1)
     {
-        ev_writer.send(ViewpointEvent {
+        ev_writer.write(ViewpointEvent {
             camera_entity: scene.camera_entity,
             viewpoint: Viewpoint::Front,
         });
@@ -207,7 +207,7 @@ fn switch_camera_viewpoint_system(
         || key_input.pressed(KeyCode::ShiftRight))
         && key_input.pressed(KeyCode::Numpad1)
     {
-        ev_writer.send(ViewpointEvent {
+        ev_writer.write(ViewpointEvent {
             camera_entity: scene.camera_entity,
             viewpoint: Viewpoint::Back,
         });
@@ -216,7 +216,7 @@ fn switch_camera_viewpoint_system(
         && !key_input.pressed(KeyCode::ShiftRight)
         && key_input.pressed(KeyCode::Numpad3)
     {
-        ev_writer.send(ViewpointEvent {
+        ev_writer.write(ViewpointEvent {
             camera_entity: scene.camera_entity,
             viewpoint: Viewpoint::Right,
         });
@@ -225,7 +225,7 @@ fn switch_camera_viewpoint_system(
         || key_input.pressed(KeyCode::ShiftRight))
         && key_input.pressed(KeyCode::Numpad3)
     {
-        ev_writer.send(ViewpointEvent {
+        ev_writer.write(ViewpointEvent {
             camera_entity: scene.camera_entity,
             viewpoint: Viewpoint::Left,
         });
@@ -234,7 +234,7 @@ fn switch_camera_viewpoint_system(
         && !key_input.pressed(KeyCode::ShiftRight)
         && key_input.pressed(KeyCode::Numpad7)
     {
-        ev_writer.send(ViewpointEvent {
+        ev_writer.write(ViewpointEvent {
             camera_entity: scene.camera_entity,
             viewpoint: Viewpoint::Top,
         });
@@ -243,7 +243,7 @@ fn switch_camera_viewpoint_system(
         || key_input.pressed(KeyCode::ShiftRight))
         && key_input.pressed(KeyCode::Numpad7)
     {
-        ev_writer.send(ViewpointEvent {
+        ev_writer.write(ViewpointEvent {
             camera_entity: scene.camera_entity,
             viewpoint: Viewpoint::Bottom,
         });
@@ -259,7 +259,7 @@ fn frame_camera_system(
         if ev.state == ButtonState::Pressed {
             match &ev.logical_key {
                 Key::Home => {
-                    ev_writer.send(FrameEvent {
+                    ev_writer.write(FrameEvent {
                         camera_entity: scene.camera_entity,
                         entities_to_be_framed: vec![scene.scene_entity],
                         include_children: true,
@@ -267,7 +267,7 @@ fn frame_camera_system(
                 }
                 Key::Character(str) => {
                     if str == "c" {
-                        ev_writer.send(FrameEvent {
+                        ev_writer.write(FrameEvent {
                             camera_entity: scene.camera_entity,
                             entities_to_be_framed: vec![scene.cube_entity],
                             include_children: false,
@@ -285,9 +285,7 @@ fn change_help_text(
     commands: &mut Commands,
     help_text: &mut HelpText,
 ) {
-    commands
-        .entity(help_text.help_text_entity)
-        .despawn_recursive();
+    commands.entity(help_text.help_text_entity).despawn();
     let help_text_entity = commands
         .spawn((
             Text::new(text),

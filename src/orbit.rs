@@ -1,7 +1,9 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    ecs::component::StorageType, prelude::*, render::camera::ScalingMode,
+    ecs::component::{ComponentHook, Mutable, StorageType},
+    prelude::*,
+    render::camera::ScalingMode,
 };
 
 use crate::{
@@ -83,37 +85,44 @@ pub struct OrbitCameraController {
 }
 
 impl Component for OrbitCameraController {
+    type Mutability = Mutable;
+
     const STORAGE_TYPE: StorageType = StorageType::Table;
 
-    fn register_component_hooks(
-        hooks: &mut bevy::ecs::component::ComponentHooks,
-    ) {
-        hooks
-            .on_add(|mut world, entity, _component_id| {
-                let projection = world.get::<Projection>(entity).unwrap();
-                let other_projection = match projection {
-                    Projection::Perspective(_) => {
-                        Projection::Orthographic(OrthographicProjection {
-                            scaling_mode: ScalingMode::FixedVertical {
-                                viewport_height: 1.0,
-                            },
-                            ..OrthographicProjection::default_3d()
-                        })
-                    }
-                    Projection::Orthographic(_) => {
-                        Projection::Perspective(PerspectiveProjection {
-                            ..default()
-                        })
-                    }
-                };
-                world
-                    .commands()
-                    .entity(entity)
-                    .insert(OtherProjection(other_projection));
-            })
-            .on_remove(|mut world, entity, _component_id| {
-                world.commands().entity(entity).remove::<OtherProjection>();
-            });
+    fn on_add() -> Option<ComponentHook> {
+        return Some(|mut world, hook_context| {
+            let projection =
+                world.get::<Projection>(hook_context.entity).unwrap();
+            let other_projection = match projection {
+                Projection::Perspective(_) => {
+                    Projection::Orthographic(OrthographicProjection {
+                        scaling_mode: ScalingMode::FixedVertical {
+                            viewport_height: 1.0,
+                        },
+                        ..OrthographicProjection::default_3d()
+                    })
+                }
+                Projection::Orthographic(_) => {
+                    Projection::Perspective(PerspectiveProjection {
+                        ..default()
+                    })
+                }
+                Projection::Custom(_) => todo!(),
+            };
+            world
+                .commands()
+                .entity(hook_context.entity)
+                .insert(OtherProjection(other_projection));
+        });
+    }
+
+    fn on_remove() -> Option<ComponentHook> {
+        return Some(|mut world, hook_context| {
+            world
+                .commands()
+                .entity(hook_context.entity)
+                .remove::<OtherProjection>();
+        });
     }
 }
 
@@ -210,6 +219,7 @@ fn orbit_camera(
                                 controller.focus,
                             )
                         }
+                        Projection::Custom(_) => todo!(),
                     };
                     let camera_to_pivot =
                         **pivot_point - camera_transform.translation;
@@ -243,6 +253,7 @@ fn orbit_camera(
                         cursor_ray.origin
                             + cursor_ray.direction * radius_minus_near
                     }
+                    Projection::Custom(_) => todo!(),
                 };
             }
         }
@@ -314,6 +325,7 @@ fn orbit_camera(
                 Projection::Orthographic(ref p) => {
                     pan *= Vec2::new(p.area.width(), p.area.height()) / vp_size;
                 }
+                Projection::Custom(_) => todo!(),
             }
             // Translate by local axes
             let right = transform.rotation * Vec3::X * -pan.x;
@@ -362,6 +374,7 @@ fn orbit_camera(
                     controller.focus +=
                         focus_to_pivot * (1.0 - (new_radius / old_radius));
                 }
+                Projection::Custom(_) => todo!(),
             }
         }
         has_moved = true;
@@ -386,7 +399,7 @@ pub(crate) fn orbit_camera_controller_system(
     windows: Query<&Window>,
     mut pivot_point: Local<Vec3>,
     mut ray_cast: MeshRayCast,
-    //mut gizmos: Gizmos,
+    // mut gizmos: Gizmos,
 ) {
     for (
         entity,
@@ -414,18 +427,16 @@ pub(crate) fn orbit_camera_controller_system(
                 &mut pivot_point,
                 &mut ray_cast,
             );
-            //gizmos.sphere(
-            //    controller.focus,
-            //    Quat::IDENTITY,
+            // gizmos.sphere(
+            //    Isometry3d::from_translation(controller.focus),
             //    0.2,
             //    bevy::color::palettes::css::AQUAMARINE,
-            //);
-            //gizmos.sphere(
-            //    *pivot_point,
-            //    Quat::IDENTITY,
+            // );
+            // gizmos.sphere(
+            //    Isometry3d::from_translation(*pivot_point),
             //    0.2,
             //    bevy::color::palettes::css::ORANGE_RED,
-            //);
+            // );
         }
         // Update the camera's transform based on current values
         if let (Some(yaw), Some(pitch), Some(radius)) =

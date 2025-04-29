@@ -153,7 +153,7 @@ fn setup_system(
         // Help text
         let help_text_entity = commands
             .spawn((
-                TargetCamera(camera_entity),
+                UiTargetCamera(camera_entity),
                 Text::new(format!("{GENERAL_HELP_TEXT}\n{ORBIT_HELP_TEXT}")),
                 TextFont {
                     font_size: 14.0,
@@ -214,7 +214,7 @@ fn switch_camera_controler_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            fly_ev_writer.send(SwitchToFlyController { camera_entity });
+            fly_ev_writer.write(SwitchToFlyController { camera_entity });
             change_help_text(
                 format!("{GENERAL_HELP_TEXT}\n{FLY_HELP_TEXT}"),
                 &mut commands,
@@ -230,7 +230,7 @@ fn switch_camera_controler_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            orbit_ev_writer.send(SwitchToOrbitController { camera_entity });
+            orbit_ev_writer.write(SwitchToOrbitController { camera_entity });
             change_help_text(
                 format!("{GENERAL_HELP_TEXT}\n{ORBIT_HELP_TEXT}"),
                 &mut commands,
@@ -255,7 +255,7 @@ fn switch_camera_projection_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(SwitchProjection { camera_entity });
+            ev_writer.write(SwitchProjection { camera_entity });
         }
     }
 }
@@ -277,7 +277,7 @@ fn switch_camera_viewpoint_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(ViewpointEvent {
+            ev_writer.write(ViewpointEvent {
                 camera_entity,
                 viewpoint: Viewpoint::Front,
             });
@@ -293,7 +293,7 @@ fn switch_camera_viewpoint_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(ViewpointEvent {
+            ev_writer.write(ViewpointEvent {
                 camera_entity,
                 viewpoint: Viewpoint::Back,
             });
@@ -309,7 +309,7 @@ fn switch_camera_viewpoint_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(ViewpointEvent {
+            ev_writer.write(ViewpointEvent {
                 camera_entity,
                 viewpoint: Viewpoint::Right,
             });
@@ -325,7 +325,7 @@ fn switch_camera_viewpoint_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(ViewpointEvent {
+            ev_writer.write(ViewpointEvent {
                 camera_entity,
                 viewpoint: Viewpoint::Left,
             });
@@ -341,7 +341,7 @@ fn switch_camera_viewpoint_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(ViewpointEvent {
+            ev_writer.write(ViewpointEvent {
                 camera_entity,
                 viewpoint: Viewpoint::Top,
             });
@@ -357,7 +357,7 @@ fn switch_camera_viewpoint_system(
             &other_windows,
         );
         if let Some(camera_entity) = camera_entity {
-            ev_writer.send(ViewpointEvent {
+            ev_writer.write(ViewpointEvent {
                 camera_entity,
                 viewpoint: Viewpoint::Bottom,
             });
@@ -385,7 +385,7 @@ fn frame_camera_system(
                         &other_windows,
                     );
                     if let Some(camera_entity) = camera_entity {
-                        ev_writer.send(FrameEvent {
+                        ev_writer.write(FrameEvent {
                             camera_entity,
                             entities_to_be_framed: vec![scene.scene_entity],
                             include_children: true,
@@ -403,7 +403,7 @@ fn frame_camera_system(
                                 &other_windows,
                             );
                         if let Some(camera_entity) = camera_entity {
-                            ev_writer.send(FrameEvent {
+                            ev_writer.write(FrameEvent {
                                 camera_entity,
                                 entities_to_be_framed: vec![scene.cube_entity],
                                 include_children: false,
@@ -425,10 +425,10 @@ fn change_help_text(
 ) {
     commands
         .entity(*help_text.camera_to_text_map.get(&camera_entity).unwrap())
-        .despawn_recursive();
+        .despawn();
     let help_text_entity = commands
         .spawn((
-            TargetCamera(camera_entity),
+            UiTargetCamera(camera_entity),
             Text::new(text),
             TextFont {
                 font_size: 14.0,

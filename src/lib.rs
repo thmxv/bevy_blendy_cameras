@@ -19,11 +19,16 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow, WindowRef},
     winit::WinitWindows,
 };
+
 #[cfg(feature = "bevy_egui")]
-use bevy_egui::EguiPreUpdateSet;
+use bevy_egui::{
+    // input::EguiWantsInput,
+    EguiPreUpdateSet,
+};
 
 #[cfg(feature = "bevy_egui")]
 pub use crate::egui::EguiWantsFocus;
+
 use crate::{
     fly::fly_camera_controller_system,
     frame::frame_system,
@@ -143,10 +148,11 @@ impl Plugin for BlendyCamerasPlugin {
         #[cfg(feature = "bevy_egui")]
         {
             app.init_resource::<EguiWantsFocus>().add_systems(
-                PreUpdate,
+                PostUpdate,
                 egui::check_egui_wants_focus
                     .in_set(BlendyCamerasSystemSet::CheckEguiWantsFocus)
-                    .after(EguiPreUpdateSet::BeginPass),
+                    .after(EguiPreUpdateSet::InitContexts)
+                    .before(BlendyCamerasSystemSet::ProcessInput),
             );
         }
     }
@@ -198,7 +204,7 @@ fn get_window_if_cursor_in_camera_viewport<'q>(
     // First check if cursor is in the same window as this camera
     if let RenderTarget::Window(win_ref) = camera.target {
         let Some((window_entity, window)) = (match win_ref {
-            WindowRef::Primary => primary_window.get_single().ok(),
+            WindowRef::Primary => primary_window.single().ok(),
             WindowRef::Entity(entity) => other_windows.get(entity).ok(),
         }) else {
             // Window does not exist - maybe it was closed and the
@@ -288,6 +294,7 @@ fn active_viewport_data_system(
         Option<&FlyCameraController>,
     )>,
     #[cfg(feature = "bevy_egui")] egui_wants_focus: Res<EguiWantsFocus>,
+    // #[cfg(feature = "bevy_egui")] egui_wants_focus: Res<EguiWantsInput>,
 ) {
     let mut new_resource = ActiveCameraData::default();
     let mut max_cam_order = 0;
@@ -340,6 +347,10 @@ fn active_viewport_data_system(
             {
                 should_get_input =
                     !egui_wants_focus.prev && !egui_wants_focus.curr;
+
+                // should_get_input = !egui_wants_focus.wants_pointer_input()
+                // && !egui_wants_focus.wants_keyboard_input();
+                // && !egui_wants_focus.is_pointer_over_area();
             }
             if should_get_input {
                 if let Some((window_entity, window)) =

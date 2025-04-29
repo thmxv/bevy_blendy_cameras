@@ -17,7 +17,7 @@ use bevy_blendy_cameras::{
     OrbitCameraController, SwitchProjection, SwitchToFlyController,
     SwitchToOrbitController, Viewpoint, ViewpointEvent,
 };
-use bevy_egui::{egui, EguiContext, EguiPlugin};
+use bevy_egui::{egui, EguiContext, EguiContextPass, EguiPlugin};
 use egui_dock::{DockArea, DockState, NodeIndex, Style, SurfaceIndex};
 
 fn main() {
@@ -27,13 +27,17 @@ fn main() {
         ..default()
     });
     app.add_plugins(DefaultPlugins)
-        .add_plugins(EguiPlugin)
+        .add_plugins(EguiPlugin {
+            // enable_multipass_for_primary_context: true,
+            enable_multipass_for_primary_context: false,
+        })
         .add_plugins(BlendyCamerasPlugin)
         .insert_resource(WinitSettings::desktop_app())
         .add_systems(Startup, setup_system)
+        .add_systems(EguiContextPass, gui_system_exclusive)
         .add_systems(
-            Update,
-            (gui_system_exclusive, set_cameras_viewports_system).chain(),
+            PostUpdate,
+            set_cameras_viewports_system.after(gui_system_exclusive),
         );
     app.run();
 }
@@ -310,6 +314,7 @@ impl TabViewer<'_> {
         let projection_text = match *projection {
             Projection::Orthographic(_) => "Orthographic",
             Projection::Perspective(_) => "Perspective",
+            Projection::Custom(_) => "Custom",
         };
         let text =
             egui::RichText::new(format!("{viewpoint_text} {projection_text}"))
@@ -516,7 +521,7 @@ fn setup_system(
 fn gui_system_exclusive(world: &mut World) {
     let Ok(egui_context) = world
         .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
-        .get_single(world)
+        .single(world)
     else {
         return;
     };
@@ -535,7 +540,7 @@ fn set_cameras_viewports_system(
     >,
     mut cameras: Query<(Entity, &mut Camera)>,
 ) {
-    let Ok((window, window_egui_settings)) = primary_window.get_single() else {
+    let Ok((window, window_egui_settings)) = primary_window.single() else {
         return;
     };
     let scale_factor =
