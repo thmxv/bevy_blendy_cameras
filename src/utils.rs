@@ -10,11 +10,8 @@ pub fn calculate_from_translation_and_focus(
     //     radius = 0.05; // Radius 0 causes problems
     // }
     let radius = comp_vec.length().max(0.05);
-    let yaw = if comp_vec.x == 0.0 && comp_vec.z >= 0.0 {
-        0.0
-    } else {
-        (comp_vec.z / (comp_vec.x.powi(2) + comp_vec.z.powi(2)).sqrt()).acos()
-    };
+    // atan2 returns [-π, π], correctly handling all quadrants
+    let yaw = comp_vec.x.atan2(comp_vec.z);
     let pitch = (comp_vec.y / radius).asin();
     (yaw, pitch, radius)
 }
