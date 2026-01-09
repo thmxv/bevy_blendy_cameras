@@ -1,9 +1,12 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    ecs::component::{ComponentHook, Mutable, StorageType},
+    camera::ScalingMode,
+    ecs::{
+        component::{Mutable, StorageType},
+        lifecycle::ComponentHook,
+    },
     prelude::*,
-    render::camera::ScalingMode,
 };
 
 use crate::{

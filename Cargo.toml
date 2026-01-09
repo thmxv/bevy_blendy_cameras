@@ -1,6 +1,6 @@
 [package]
 name = "bevy_blendy_cameras"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Xavier Thomas"]
 description = "Bevy editor like cameras controls for Pan/Orbit/Zoom and Fly mode. Switch mode, set camera viewpoint and frame view around entities"
@@ -34,7 +34,7 @@ unsafe_code = "deny"
 bevy_egui = ["dep:bevy_egui"]
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = [
+bevy = { version = "0.17", default-features = false, features = [
     "bevy_asset",
     "bevy_mesh_picking_backend",
     "bevy_render",
@@ -42,16 +42,16 @@ bevy = { version = "0.16", default-features = false, features = [
     "bevy_winit",
     "bevy_log",
 ] }
-bevy_egui = { version = "0.34", optional = true, default-features = false }
+bevy_egui = { version = "0.38.1", optional = true, default-features = false }
 winit = "0.30"
 
 [dev-dependencies]
-bevy = { version = "0.16" }
-bevy_egui = { version = "0.34", default-features = false, features = [
+bevy = { version = "0.17" }
+bevy_egui = { version = "0.38.1", default-features = false, features = [
     "render",
     "default_fonts",
 ] }
-egui_dock = "0.16"
+egui_dock = "0.18"
 
 [[example]]
 name = "egui_full"
