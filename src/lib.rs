@@ -12,12 +12,12 @@
 //! - Switch between orthographic and perspective camera projection
 
 use bevy::{
+    camera::{CameraUpdateSystems, RenderTarget},
     input::{keyboard::KeyCode, mouse::MouseWheel, ButtonInput},
     prelude::*,
-    render::camera::{CameraUpdateSystem, RenderTarget},
-    transform::TransformSystem,
-    window::{CursorGrabMode, PrimaryWindow, WindowRef},
-    winit::WinitWindows,
+    transform::TransformSystems,
+    window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
+    winit::WINIT_WINDOWS,
 };
 
 #[cfg(feature = "bevy_egui")]
@@ -54,24 +54,24 @@ pub mod raycast;
 mod utils;
 mod viewpoints;
 
-/// Event to switch between perspective and ortographic camera projections
-#[derive(Event)]
+/// Message to switch between perspective and ortographic camera projections
+#[derive(Message)]
 pub struct SwitchProjection {
     /// The camera entity for switch to change the view projection
     pub camera_entity: Entity,
 }
 
-/// Event to enable the [`OrbitCameraController`] and disable the
+/// Message to enable the [`OrbitCameraController`] and disable the
 /// [`FlyCameraController`] if present
-#[derive(Event)]
+#[derive(Message)]
 pub struct SwitchToOrbitController {
     /// The camera entity to switch to pan/orbit/zoom control mode
     pub camera_entity: Entity,
 }
 
-/// Event to enable the [`FlyCameraController`] and disable the
+/// Message to enable the [`FlyCameraController`] and disable the
 /// [`OrbitCameraController`] if present
-#[derive(Event)]
+#[derive(Message)]
 pub struct SwitchToFlyController {
     /// The camera entity to switch to fly control mode
     pub camera_entity: Entity,
@@ -92,7 +92,7 @@ pub enum BlendyCamerasSystemSet {
     ProcessInput,
     /// Handle the [`SwitchProjection`], [`SwitchToOrbitController`],
     /// [`SwitchToFlyController`], [`ViewpointEvent`] and [`FrameEvent`]
-    /// events
+    /// messages
     HandleEvents,
     /// Handle the [`OrbitCameraController`] and [`FlyCameraController`] only
     /// if egui has not the focus
@@ -106,11 +106,11 @@ impl Plugin for BlendyCamerasPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ActiveCameraData>()
             .init_resource::<MouseKeyTracker>()
-            .add_event::<SwitchProjection>()
-            .add_event::<SwitchToOrbitController>()
-            .add_event::<SwitchToFlyController>()
-            .add_event::<ViewpointEvent>()
-            .add_event::<FrameEvent>()
+            .add_message::<SwitchProjection>()
+            .add_message::<SwitchToOrbitController>()
+            .add_message::<SwitchToFlyController>()
+            .add_message::<ViewpointEvent>()
+            .add_message::<FrameEvent>()
             .add_systems(
                 PostUpdate,
                 (
@@ -142,8 +142,8 @@ impl Plugin for BlendyCamerasPlugin {
                 (orbit_camera_controller_system, fly_camera_controller_system)
                     .in_set(BlendyCamerasSystemSet::Controllers)
                     .after(BlendyCamerasSystemSet::HandleEvents)
-                    .before(CameraUpdateSystem)
-                    .before(TransformSystem::TransformPropagate),
+                    .before(CameraUpdateSystems)
+                    .before(TransformSystems::Propagate),
             );
         #[cfg(feature = "bevy_egui")]
         {
@@ -283,7 +283,7 @@ fn active_viewport_data_system(
     mut active_cam: ResMut<ActiveCameraData>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     key_input: Res<ButtonInput<KeyCode>>,
-    scroll_events: EventReader<MouseWheel>,
+    scroll_events: MessageReader<MouseWheel>,
     touches: Res<Touches>,
     primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
     other_windows: Query<(Entity, &Window), Without<PrimaryWindow>>,
@@ -393,21 +393,21 @@ fn wrap_grab_center_cursor_system(
     mouse_input: Res<ButtonInput<MouseButton>>,
     key_input: Res<ButtonInput<KeyCode>>,
     mut windows: Query<&mut Window>,
+    mut cursor_options: Query<&mut CursorOptions>,
     orbit_fly_cameras: Query<(
         &Camera,
         Option<&OrbitCameraController>,
         Option<&FlyCameraController>,
     )>,
     mut cursor_start_pos: Local<Option<Vec2>>,
-    winit_windows: NonSendMut<WinitWindows>,
 ) {
     let Some(window_entity) = active_cam.window_entity else {
         return;
     };
-    let Some(winit_window) = winit_windows.get_window(window_entity) else {
+    let Ok(mut window) = windows.get_mut(window_entity) else {
         return;
     };
-    let Ok(mut window) = windows.get_mut(window_entity) else {
+    let Ok(mut cursor_opts) = cursor_options.get_mut(window_entity) else {
         return;
     };
     let Some(camera_entity) = active_cam.entity else {
@@ -496,24 +496,30 @@ fn wrap_grab_center_cursor_system(
             // - On Wayland only `Locked` works and cannot set cursor position
             //   unless it is locked according to message but can never be
             //   set according to tests.
-            window.cursor_options.grab_mode = CursorGrabMode::Locked;
-            // window.cursor_options.grab_mode = CursorGrabMode::Confined;
+            cursor_opts.grab_mode = CursorGrabMode::Locked;
+            // cursor_opts.grab_mode = CursorGrabMode::Confined;
         }
         if center_cursor {
             let center = viewport_rect.center();
             // HACK: Avoid Wayland error message
-            let _ = winit_window
-                .set_cursor_grab(winit::window::CursorGrabMode::Locked);
+            WINIT_WINDOWS.with_borrow(|winit_windows| {
+                if let Some(winit_window) =
+                    winit_windows.get_window(window_entity)
+                {
+                    let _ = winit_window
+                        .set_cursor_grab(winit::window::CursorGrabMode::Locked);
+                }
+            });
             // End of hack
-            window.cursor_options.grab_mode = CursorGrabMode::Locked;
-            // window.cursor_options.visible = false;
+            cursor_opts.grab_mode = CursorGrabMode::Locked;
+            // cursor_opts.visible = false;
             // FIXME: Does not work in Wayland
             window.set_cursor_position(Some(center));
         }
     } else if drag_just_released {
         *cursor_start_pos = None;
-        window.cursor_options.grab_mode = CursorGrabMode::None;
-        // window.cursor_options.visible = true;
+        cursor_opts.grab_mode = CursorGrabMode::None;
+        // cursor_opts.visible = true;
     }
     // Only wrap/center/grab if dragging started in the viewport.
     if cursor_start_pos.is_some()
@@ -549,7 +555,7 @@ fn wrap_grab_center_cursor_system(
 }
 
 fn switch_to_orbit_camera_controller_system(
-    mut ev_read: EventReader<SwitchToOrbitController>,
+    mut ev_read: MessageReader<SwitchToOrbitController>,
     mut query: Query<(
         &Transform,
         &mut OrbitCameraController,
@@ -579,7 +585,7 @@ fn switch_to_orbit_camera_controller_system(
 }
 
 fn switch_to_fly_camera_controller_system(
-    mut ev_read: EventReader<SwitchToFlyController>,
+    mut ev_read: MessageReader<SwitchToFlyController>,
     mut query: Query<(
         &mut Transform,
         &mut OrbitCameraController,
@@ -638,7 +644,7 @@ fn switch_camera_projection(
 }
 
 fn switch_camera_projection_system(
-    mut ev_read: EventReader<SwitchProjection>,
+    mut ev_read: MessageReader<SwitchProjection>,
     mut query: Query<(
         &mut Transform,
         &OrbitCameraController,

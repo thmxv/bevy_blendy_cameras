@@ -3,12 +3,12 @@
 use std::collections::HashMap;
 
 use bevy::{
+    camera::Viewport,
     ecs::{
         schedule::{LogLevel, ScheduleBuildSettings},
         system::SystemState,
     },
     prelude::*,
-    render::camera::Viewport,
     window::PrimaryWindow,
     winit::WinitSettings,
 };
@@ -17,7 +17,9 @@ use bevy_blendy_cameras::{
     OrbitCameraController, SwitchProjection, SwitchToFlyController,
     SwitchToOrbitController, Viewpoint, ViewpointEvent,
 };
-use bevy_egui::{egui, EguiContext, EguiContextPass, EguiPlugin};
+use bevy_egui::{
+    egui, EguiContext, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext,
+};
 use egui_dock::{DockArea, DockState, NodeIndex, Style, SurfaceIndex};
 
 fn main() {
@@ -28,13 +30,12 @@ fn main() {
     });
     app.add_plugins(DefaultPlugins)
         .add_plugins(EguiPlugin {
-            // enable_multipass_for_primary_context: true,
-            enable_multipass_for_primary_context: false,
+            ..Default::default()
         })
         .add_plugins(BlendyCamerasPlugin)
         .insert_resource(WinitSettings::desktop_app())
         .add_systems(Startup, setup_system)
-        .add_systems(EguiContextPass, gui_system_exclusive)
+        .add_systems(EguiPrimaryContextPass, gui_system_exclusive)
         .add_systems(
             PostUpdate,
             set_cameras_viewports_system.after(gui_system_exclusive),
@@ -102,6 +103,7 @@ impl UiState {
         };
         let mut style = Style::from_egui(ctx.style().as_ref());
         style.tab.tab_body.inner_margin = egui_dock::egui::Margin::same(0);
+
         DockArea::new(&mut self.dock_state)
             .show_add_buttons(true)
             .show_add_popup(true)
@@ -156,88 +158,89 @@ impl TabViewer<'_> {
             .fill(ui.visuals().window_fill)
             .inner_margin(egui::Margin::symmetric(8, 2))
             .show(ui, |ui| {
-                egui::menu::bar(ui, |ui| {
-                    egui::menu::menu_button(ui, "View", |ui| {
+                egui::MenuBar::new().ui(ui, |ui| {
+                    ui.menu_button("View", |ui| {
                         if ui.button("Frame All").clicked() {
                             let scene = self.world.resource::<Scene>();
-                            self.world.send_event(FrameEvent {
+                            self.world.write_message(FrameEvent {
                                 camera_entity,
                                 entities_to_be_framed: vec![scene.scene_entity],
                                 include_children: true,
                             });
-                            ui.close_menu();
+                            ui.close();
                         }
                         if ui.button("Frame Cube").clicked() {
                             let scene = self.world.resource::<Scene>();
-                            self.world.send_event(FrameEvent {
+                            self.world.write_message(FrameEvent {
                                 camera_entity,
                                 entities_to_be_framed: vec![scene.cube_entity],
                                 include_children: false,
                             });
-                            ui.close_menu();
+                            ui.close();
                         }
                         if ui.button("Perspective/Orthographic").clicked() {
-                            self.world
-                                .send_event(SwitchProjection { camera_entity });
-                            ui.close_menu();
+                            self.world.write_message(SwitchProjection {
+                                camera_entity,
+                            });
+                            ui.close();
                         }
                         ui.separator();
                         ui.menu_button("Viewpoint", |ui| {
                             if ui.button("Top").clicked() {
-                                self.world.send_event(ViewpointEvent {
+                                self.world.write_message(ViewpointEvent {
                                     camera_entity,
                                     viewpoint: Viewpoint::Top,
                                 });
-                                ui.close_menu();
+                                ui.close();
                             }
                             if ui.button("Bottom").clicked() {
-                                self.world.send_event(ViewpointEvent {
+                                self.world.write_message(ViewpointEvent {
                                     camera_entity,
                                     viewpoint: Viewpoint::Bottom,
                                 });
-                                ui.close_menu();
+                                ui.close();
                             }
                             if ui.button("Front").clicked() {
-                                self.world.send_event(ViewpointEvent {
+                                self.world.write_message(ViewpointEvent {
                                     camera_entity,
                                     viewpoint: Viewpoint::Front,
                                 });
-                                ui.close_menu();
+                                ui.close();
                             }
                             if ui.button("Back").clicked() {
-                                self.world.send_event(ViewpointEvent {
+                                self.world.write_message(ViewpointEvent {
                                     camera_entity,
                                     viewpoint: Viewpoint::Back,
                                 });
-                                ui.close_menu();
+                                ui.close();
                             }
                             if ui.button("Left").clicked() {
-                                self.world.send_event(ViewpointEvent {
+                                self.world.write_message(ViewpointEvent {
                                     camera_entity,
                                     viewpoint: Viewpoint::Left,
                                 });
-                                ui.close_menu();
+                                ui.close();
                             }
                             if ui.button("Right").clicked() {
-                                self.world.send_event(ViewpointEvent {
+                                self.world.write_message(ViewpointEvent {
                                     camera_entity,
                                     viewpoint: Viewpoint::Right,
                                 });
-                                ui.close_menu();
+                                ui.close();
                             }
                         });
                         ui.menu_button("Navigation", |ui| {
                             if ui.button("Orbit").clicked() {
-                                self.world.send_event(
+                                self.world.write_message(
                                     SwitchToOrbitController { camera_entity },
                                 );
-                                ui.close_menu();
+                                ui.close();
                             }
                             if ui.button("Fly").clicked() {
-                                self.world.send_event(SwitchToFlyController {
-                                    camera_entity,
-                                });
-                                ui.close_menu();
+                                self.world.write_message(
+                                    SwitchToFlyController { camera_entity },
+                                );
+                                ui.close();
                             }
                         });
                     });
@@ -288,11 +291,11 @@ impl TabViewer<'_> {
         });
         if switch_to_orbit {
             self.world
-                .send_event(SwitchToOrbitController { camera_entity });
+                .write_message(SwitchToOrbitController { camera_entity });
         }
         if switch_to_fly {
             self.world
-                .send_event(SwitchToFlyController { camera_entity });
+                .write_message(SwitchToFlyController { camera_entity });
         }
         response.response.rect
     }
@@ -377,6 +380,7 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                     Some(ui.available_rect_before_wrap()),
                     //Some(ui.clip_rect()),
                 );
+
                 let toolbar_rect = self.view3d_toolbar_ui(ui, *camera_entity);
                 ui.horizontal(|ui| {
                     ui.add_space(toolbar_rect.width() + 12.0);
@@ -423,14 +427,17 @@ impl egui_dock::TabViewer for TabViewer<'_> {
         }
     }
 
-    fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
+    fn on_close(
+        &mut self,
+        tab: &mut Self::Tab,
+    ) -> egui_dock::tab_viewer::OnCloseResponse {
         match tab {
             DockTab::View3D(camera_entity) => {
                 self.viewport_rects.remove(camera_entity);
             }
             _ => {}
         }
-        true
+        egui_dock::tab_viewer::OnCloseResponse::Close
     }
 
     fn add_popup(
@@ -488,6 +495,18 @@ fn setup_system(
         },
         Transform::from_xyz(4.0, 8.0, 4.0),
     ));
+
+    // UI Camera - create FIRST so egui attaches to it instead of the 3D cameras
+    // This camera renders egui over the full window, not constrained to any 3D viewport
+    commands.spawn((
+        Camera2d,
+        Camera {
+            order: 100,                          // Render after all 3D cameras
+            clear_color: ClearColorConfig::None, // Don't clear the 3D content
+            ..default()
+        },
+    ));
+
     // Cameras
     let mut camera_entities = Vec::new();
     for n in 0..2 {
@@ -520,7 +539,7 @@ fn setup_system(
 
 fn gui_system_exclusive(world: &mut World) {
     let Ok(egui_context) = world
-        .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
+        .query_filtered::<&mut EguiContext, With<PrimaryEguiContext>>()
         .single(world)
     else {
         return;
@@ -534,21 +553,33 @@ fn gui_system_exclusive(world: &mut World) {
 
 fn set_cameras_viewports_system(
     ui_state: Res<UiState>,
-    primary_window: Query<
-        (&mut Window, &bevy_egui::EguiContextSettings),
-        With<PrimaryWindow>,
+    primary_window: Query<&Window, With<PrimaryWindow>>,
+    egui_settings: Query<
+        &bevy_egui::EguiContextSettings,
+        With<PrimaryEguiContext>,
     >,
     mut cameras: Query<(Entity, &mut Camera)>,
 ) {
-    let Ok((window, window_egui_settings)) = primary_window.single() else {
+    let Ok(window) = primary_window.single() else {
+        return;
+    };
+    let Ok(egui_context_settings) = egui_settings.single() else {
         return;
     };
     let scale_factor =
-        window.scale_factor() * window_egui_settings.scale_factor;
+        window.scale_factor() * egui_context_settings.scale_factor;
 
     for (entity, mut cam) in &mut cameras {
-        let viewport_rect =
-            ui_state.camera_viewport_rects_map.get(&entity).unwrap();
+        // Only process cameras that are in our viewport map (3D cameras)
+        // Leave other cameras (like the UI camera) alone
+        if !ui_state.camera_viewport_rects_map.contains_key(&entity) {
+            continue;
+        }
+
+        let viewport_rect = ui_state
+            .camera_viewport_rects_map
+            .get(&entity)
+            .and_then(|opt| *opt);
         if let Some(viewport_rect) = viewport_rect {
             let viewport_pos =
                 viewport_rect.left_top().to_vec2() * scale_factor;

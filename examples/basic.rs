@@ -150,8 +150,8 @@ fn setup_system(
 fn switch_camera_controler_system(
     mut commands: Commands,
     key_input: Res<ButtonInput<KeyCode>>,
-    mut orbit_ev_writer: EventWriter<SwitchToOrbitController>,
-    mut fly_ev_writer: EventWriter<SwitchToFlyController>,
+    mut orbit_ev_writer: MessageWriter<SwitchToOrbitController>,
+    mut fly_ev_writer: MessageWriter<SwitchToFlyController>,
     mut help_text: ResMut<HelpText>,
     scene: Res<Scene>,
 ) {
@@ -179,7 +179,7 @@ fn switch_camera_controler_system(
 
 fn switch_camera_projection_system(
     key_input: Res<ButtonInput<KeyCode>>,
-    mut ev_writer: EventWriter<SwitchProjection>,
+    mut ev_writer: MessageWriter<SwitchProjection>,
     scene: Res<Scene>,
 ) {
     if key_input.just_pressed(KeyCode::Numpad5) {
@@ -191,7 +191,7 @@ fn switch_camera_projection_system(
 
 fn switch_camera_viewpoint_system(
     key_input: Res<ButtonInput<KeyCode>>,
-    mut ev_writer: EventWriter<ViewpointEvent>,
+    mut ev_writer: MessageWriter<ViewpointEvent>,
     scene: Res<Scene>,
 ) {
     if !key_input.pressed(KeyCode::ShiftLeft)
@@ -251,8 +251,8 @@ fn switch_camera_viewpoint_system(
 }
 
 fn frame_camera_system(
-    mut ev_reader: EventReader<KeyboardInput>,
-    mut ev_writer: EventWriter<FrameEvent>,
+    mut ev_reader: MessageReader<KeyboardInput>,
+    mut ev_writer: MessageWriter<FrameEvent>,
     scene: Res<Scene>,
 ) {
     for ev in ev_reader.read() {

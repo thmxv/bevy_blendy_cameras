@@ -97,8 +97,8 @@ impl Viewpoint {
     }
 }
 
-/// Event used to set the camera point of view
-#[derive(Event)]
+/// Message used to set the camera point of view
+#[derive(Message)]
 pub struct ViewpointEvent {
     /// The camera for wich to change viewpoint
     pub camera_entity: Entity,
@@ -108,7 +108,7 @@ pub struct ViewpointEvent {
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn viewpoint_system(
-    mut ev_read: EventReader<ViewpointEvent>,
+    mut ev_read: MessageReader<ViewpointEvent>,
     // active_cam: Res<ActiveCameraData>,
     mut cameras_query: Query<
         (

@@ -3,13 +3,13 @@
 use std::collections::HashMap;
 
 use bevy::{
+    camera::Viewport,
     ecs::schedule::{LogLevel, ScheduleBuildSettings},
     input::{
         keyboard::{Key, KeyboardInput},
         ButtonState,
     },
     prelude::*,
-    render::camera::Viewport,
     window::{PrimaryWindow, WindowResized},
 };
 
@@ -175,7 +175,7 @@ fn setup_system(
 
 fn set_camera_viewports_system(
     windows: Query<&Window>,
-    mut resize_events: EventReader<WindowResized>,
+    mut resize_events: MessageReader<WindowResized>,
     mut query: Query<(&CameraPosition, &mut Camera)>,
 ) {
     // We need to dynamically resize the camera's viewports whenever the
@@ -200,8 +200,8 @@ fn set_camera_viewports_system(
 fn switch_camera_controler_system(
     mut commands: Commands,
     key_input: Res<ButtonInput<KeyCode>>,
-    mut orbit_ev_writer: EventWriter<SwitchToOrbitController>,
-    mut fly_ev_writer: EventWriter<SwitchToFlyController>,
+    mut orbit_ev_writer: MessageWriter<SwitchToOrbitController>,
+    mut fly_ev_writer: MessageWriter<SwitchToFlyController>,
     mut help_text: ResMut<HelpText>,
     mut cameras_query: Query<(Entity, &Camera), With<Camera3d>>,
     primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
@@ -243,7 +243,7 @@ fn switch_camera_controler_system(
 
 fn switch_camera_projection_system(
     key_input: Res<ButtonInput<KeyCode>>,
-    mut ev_writer: EventWriter<SwitchProjection>,
+    mut ev_writer: MessageWriter<SwitchProjection>,
     mut cameras_query: Query<(Entity, &Camera), With<Camera3d>>,
     primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
     other_windows: Query<(Entity, &Window), Without<PrimaryWindow>>,
@@ -262,7 +262,7 @@ fn switch_camera_projection_system(
 
 fn switch_camera_viewpoint_system(
     key_input: Res<ButtonInput<KeyCode>>,
-    mut ev_writer: EventWriter<ViewpointEvent>,
+    mut ev_writer: MessageWriter<ViewpointEvent>,
     mut cameras_query: Query<(Entity, &Camera), With<Camera3d>>,
     primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
     other_windows: Query<(Entity, &Window), Without<PrimaryWindow>>,
@@ -366,8 +366,8 @@ fn switch_camera_viewpoint_system(
 }
 
 fn frame_camera_system(
-    mut ev_reader: EventReader<KeyboardInput>,
-    mut ev_writer: EventWriter<FrameEvent>,
+    mut ev_reader: MessageReader<KeyboardInput>,
+    mut ev_writer: MessageWriter<FrameEvent>,
     scene: Res<Scene>,
     mut cameras_query: Query<(Entity, &Camera), With<Camera3d>>,
     primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,

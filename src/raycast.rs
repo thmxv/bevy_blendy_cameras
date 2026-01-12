@@ -24,5 +24,7 @@ pub fn get_nearest_intersection<'a>(
     ray_cast: &'a mut MeshRayCast,
     ray: Ray3d,
 ) -> Option<&'a (Entity, RayMeshHit)> {
-    ray_cast.cast_ray(ray, &MeshRayCastSettings::default()).first()
+    ray_cast
+        .cast_ray(ray, &MeshRayCastSettings::default())
+        .first()
 }
